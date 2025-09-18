@@ -66,6 +66,10 @@
                             <i class="fab fa-facebook"></i> Conectar com Facebook
                         </a>
                         
+                        <a href="{{ route('platforms.debug', $platform) }}" class="btn btn-info w-100 mb-2">
+                            <i class="fas fa-bug"></i> Debug OAuth
+                        </a>
+                        
                         <div class="alert alert-info">
                             <small>
                                 <strong>Permissões solicitadas:</strong><br>

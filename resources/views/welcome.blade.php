@@ -275,3 +275,6 @@
         @endif
     </body>
 </html>
+        <footer class="w-full text-center mt-6 text-sm">
+            <a href="{{ route('privacy') }}" class="underline text-[#1b1b18] dark:text-[#EDEDEC]">Política de Privacidade</a>
+        </footer>

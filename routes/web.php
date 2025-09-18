@@ -15,3 +15,5 @@ Route::resource('platforms', PlatformController::class);
 Route::get('platforms/{platform}/connect', [PlatformController::class, 'connect'])->name('platforms.connect');
 Route::get('platforms/{platform}/callback', [PlatformController::class, 'callback'])->name('platforms.callback');
 Route::post('platforms/{platform}/disconnect', [PlatformController::class, 'disconnect'])->name('platforms.disconnect');
+// Rota para política de privacidade
+Route::view('/privacidade', 'privacy')->name('privacy');

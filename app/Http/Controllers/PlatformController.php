@@ -132,27 +132,43 @@ class PlatformController extends Controller
         ]);
 
         // Verificar se houve erro na autorização
-        if ($request->has('error')) {
-            \Log::warning('OAuth Error recebido', [
-                'error' => $request->get('error'),
-                'error_description' => $request->get('error_description'),
-                'platform_id' => $platform->id,
-            ]);
-            
+        if ($request->has('error') || $request->has('error_code') || $request->has('error_message')) {
             $error = $request->get('error');
+            $errorCode = $request->get('error_code');
+            $errorMessage = $request->get('error_message');
             $errorDescription = $request->get('error_description');
             
-            // Se for erro de URI inválida, redirecionar para página de configuração
+            \Log::warning('OAuth Error recebido', [
+                'error' => $error,
+                'error_code' => $errorCode,
+                'error_message' => $errorMessage,
+                'error_description' => $errorDescription,
+                'platform_id' => $platform->id,
+                'all_params' => $request->all(),
+            ]);
+            
+            // Erro específico de domínio (código 1349048)
+            if ($errorCode == '1349048' || strpos($errorMessage, 'domínio') !== false || strpos($errorMessage, 'domain') !== false) {
+                return redirect()->route('platforms.domain-error', $platform)
+                    ->with('error', 'Erro de domínio do Facebook: ' . $errorMessage)
+                    ->with('error_details', [
+                        'error_code' => $errorCode,
+                        'error_message' => $errorMessage,
+                        'solution' => 'domain_config'
+                    ]);
+            }
+            
+            // Erro de URI inválida
             if ($error === 'redirect_uri_mismatch' || 
                 strpos($errorDescription, 'redirect_uri') !== false ||
                 strpos($errorDescription, 'Invalid') !== false) {
                 
                 return redirect()->route('platforms.facebook-setup', $platform)
-                    ->with('error', 'URI de redirecionamento inválida. Configure no Facebook: ' . $errorDescription);
+                    ->with('error', 'URI de redirecionamento inválida: ' . ($errorDescription ?: $errorMessage));
             }
             
             return redirect()->route('platforms.show', $platform)
-                ->with('error', 'Autorização negada: ' . $errorDescription);
+                ->with('error', 'Erro de autorização: ' . ($errorDescription ?: $errorMessage ?: $error));
         }
 
         // Processar callback do Facebook

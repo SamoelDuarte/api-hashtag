@@ -26,6 +26,11 @@ Route::get('platforms/{platform}/facebook-setup', function (App\Models\Platform 
     return view('platforms.facebook-setup', compact('platform'));
 })->name('platforms.facebook-setup');
 
+// Rota para erro específico de domínio
+Route::get('platforms/{platform}/domain-error', function (App\Models\Platform $platform) {
+    return view('platforms.domain-error', compact('platform'));
+})->name('platforms.domain-error');
+
 // Rota para testar se callback está funcionando
 Route::get('platforms/{platform}/test-callback', function (App\Models\Platform $platform) {
     return response()->json([
@@ -37,6 +42,65 @@ Route::get('platforms/{platform}/test-callback', function (App\Models\Platform $
         'timestamp' => now()->toISOString(),
     ]);
 })->name('platforms.test-callback');
+
+// Rota para verificar configuração do Facebook
+Route::get('platforms/{platform}/check-facebook-config', function (App\Models\Platform $platform) {
+    $checks = [
+        'domain_reachable' => false,
+        'callback_reachable' => false,
+        'privacy_policy_reachable' => false,
+        'https_available' => false,
+    ];
+    
+    $messages = [];
+    
+    // Verificar se o domínio está acessível
+    try {
+        $response = \Illuminate\Support\Facades\Http::timeout(10)->get('https://hashtag.betasolucao.com.br');
+        $checks['domain_reachable'] = $response->successful();
+        $messages['domain'] = $checks['domain_reachable'] ? 'Domínio acessível' : 'Domínio não acessível';
+    } catch (\Exception $e) {
+        $messages['domain'] = 'Erro ao acessar domínio: ' . $e->getMessage();
+    }
+    
+    // Verificar se o callback está acessível
+    try {
+        $response = \Illuminate\Support\Facades\Http::timeout(10)->get($platform->redirect_uri . '?test=1');
+        $checks['callback_reachable'] = true; // Se não deu exceção, está acessível
+        $messages['callback'] = 'Callback acessível';
+    } catch (\Exception $e) {
+        $messages['callback'] = 'Erro ao acessar callback: ' . $e->getMessage();
+    }
+    
+    // Verificar política de privacidade
+    try {
+        $privacyUrl = str_replace('http://', 'https://', url('/privacidade'));
+        $response = \Illuminate\Support\Facades\Http::timeout(10)->get($privacyUrl);
+        $checks['privacy_policy_reachable'] = $response->successful();
+        $messages['privacy'] = $checks['privacy_policy_reachable'] ? 'Política de privacidade acessível' : 'Política de privacidade não acessível';
+    } catch (\Exception $e) {
+        $messages['privacy'] = 'Erro ao acessar política: ' . $e->getMessage();
+    }
+    
+    // Verificar se HTTPS está disponível
+    $checks['https_available'] = strpos($platform->redirect_uri, 'https://') === 0;
+    $messages['https'] = $checks['https_available'] ? 'HTTPS configurado' : 'HTTPS não configurado (pode causar problemas)';
+    
+    return response()->json([
+        'platform_id' => $platform->id,
+        'checks' => $checks,
+        'messages' => $messages,
+        'overall_status' => array_reduce($checks, function($carry, $check) {
+            return $carry && $check;
+        }, true) ? 'success' : 'warning',
+        'recommendations' => [
+            'Configure HTTPS se possível',
+            'Aguarde 5-10 minutos após alterar configurações no Facebook',
+            'Verifique se o app está em modo "Live" ou "Development"',
+            'Certifique-se de salvar todas as alterações no Facebook'
+        ]
+    ]);
+})->name('platforms.check-facebook-config');
 
 // Rota para ver logs do callback
 Route::get('platforms/{platform}/logs', function (App\Models\Platform $platform) {

@@ -139,8 +139,20 @@ class PlatformController extends Controller
                 'platform_id' => $platform->id,
             ]);
             
+            $error = $request->get('error');
+            $errorDescription = $request->get('error_description');
+            
+            // Se for erro de URI inválida, redirecionar para página de configuração
+            if ($error === 'redirect_uri_mismatch' || 
+                strpos($errorDescription, 'redirect_uri') !== false ||
+                strpos($errorDescription, 'Invalid') !== false) {
+                
+                return redirect()->route('platforms.facebook-setup', $platform)
+                    ->with('error', 'URI de redirecionamento inválida. Configure no Facebook: ' . $errorDescription);
+            }
+            
             return redirect()->route('platforms.show', $platform)
-                ->with('error', 'Autorização negada: ' . $request->get('error_description'));
+                ->with('error', 'Autorização negada: ' . $errorDescription);
         }
 
         // Processar callback do Facebook

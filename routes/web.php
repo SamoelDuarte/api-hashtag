@@ -21,6 +21,23 @@ Route::get('platforms/{platform}/debug', function (App\Models\Platform $platform
     return view('platforms.debug', compact('platform'));
 })->name('platforms.debug');
 
+// Rota para configuração específica do Facebook
+Route::get('platforms/{platform}/facebook-setup', function (App\Models\Platform $platform) {
+    return view('platforms.facebook-setup', compact('platform'));
+})->name('platforms.facebook-setup');
+
+// Rota para testar se callback está funcionando
+Route::get('platforms/{platform}/test-callback', function (App\Models\Platform $platform) {
+    return response()->json([
+        'status' => 'success',
+        'message' => 'Callback está acessível!',
+        'platform_id' => $platform->id,
+        'platform_name' => $platform->name,
+        'redirect_uri' => $platform->redirect_uri,
+        'timestamp' => now()->toISOString(),
+    ]);
+})->name('platforms.test-callback');
+
 // Rota para ver logs do callback
 Route::get('platforms/{platform}/logs', function (App\Models\Platform $platform) {
     $logFile = storage_path('logs/laravel.log');

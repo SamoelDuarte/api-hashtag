@@ -70,6 +70,10 @@
                             <i class="fas fa-cog"></i> Configurar Facebook App
                         </a>
                         
+                        <a href="{{ route('platforms.uri-invalid', $platform) }}" class="btn btn-warning w-100 mb-2">
+                            <i class="fas fa-exclamation-triangle"></i> Resolver URI Inválida
+                        </a>
+                        
                         <a href="{{ route('platforms.debug', $platform) }}" class="btn btn-info w-100 mb-2">
                             <i class="fas fa-bug"></i> Debug OAuth
                         </a>

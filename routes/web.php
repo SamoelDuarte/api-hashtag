@@ -31,6 +31,40 @@ Route::get('platforms/{platform}/domain-error', function (App\Models\Platform $p
     return view('platforms.domain-error', compact('platform'));
 })->name('platforms.domain-error');
 
+// Rota para URI inválida no validador
+Route::get('platforms/{platform}/uri-invalid', function (App\Models\Platform $platform) {
+    return view('platforms.uri-invalid', compact('platform'));
+})->name('platforms.uri-invalid');
+
+// Rota para gerar variações de URI para teste
+Route::get('platforms/{platform}/uri-variations', function (App\Models\Platform $platform) {
+    $baseUrl = parse_url($platform->redirect_uri);
+    $domain = $baseUrl['host'];
+    $path = $baseUrl['path'];
+    
+    $variations = [
+        'original' => $platform->redirect_uri,
+        'https' => 'https://' . $domain . $path,
+        'http' => 'http://' . $domain . $path,
+        'without_www' => 'https://' . str_replace('www.', '', $domain) . $path,
+        'with_www' => 'https://www.' . str_replace('www.', '', $domain) . $path,
+        'localhost_dev' => 'http://localhost:8000' . $path,
+        'localhost_https' => 'https://localhost:8000' . $path,
+    ];
+    
+    return response()->json([
+        'platform_id' => $platform->id,
+        'current_uri' => $platform->redirect_uri,
+        'variations' => $variations,
+        'recommendations' => [
+            'Teste a URI original primeiro',
+            'Se não funcionar, tente a versão HTTPS',
+            'Para desenvolvimento, use localhost',
+            'Certifique-se de que o domínio está nos "Domínios do app"'
+        ]
+    ]);
+})->name('platforms.uri-variations');
+
 // Rota para testar se callback está funcionando
 Route::get('platforms/{platform}/test-callback', function (App\Models\Platform $platform) {
     return response()->json([

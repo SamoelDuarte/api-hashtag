@@ -161,10 +161,11 @@ class PlatformController extends Controller
             // Erro de URI inválida
             if ($error === 'redirect_uri_mismatch' || 
                 strpos($errorDescription, 'redirect_uri') !== false ||
-                strpos($errorDescription, 'Invalid') !== false) {
+                strpos($errorDescription, 'Invalid') !== false ||
+                strpos($errorMessage, 'URI de redirecionamento inválido') !== false) {
                 
-                return redirect()->route('platforms.facebook-setup', $platform)
-                    ->with('error', 'URI de redirecionamento inválida: ' . ($errorDescription ?: $errorMessage));
+                return redirect()->route('platforms.uri-invalid', $platform)
+                    ->with('error', 'URI rejeitada pelo Facebook: ' . ($errorDescription ?: $errorMessage));
             }
             
             return redirect()->route('platforms.show', $platform)

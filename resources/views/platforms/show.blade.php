@@ -70,6 +70,10 @@
                             <i class="fas fa-bug"></i> Debug OAuth
                         </a>
                         
+                        <a href="{{ route('platforms.logs', $platform) }}" class="btn btn-outline-info w-100 mb-2">
+                            <i class="fas fa-file-alt"></i> Ver Logs
+                        </a>
+                        
                         <div class="alert alert-info">
                             <small>
                                 <strong>Permissões solicitadas:</strong><br>

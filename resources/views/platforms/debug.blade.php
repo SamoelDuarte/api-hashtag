@@ -38,25 +38,40 @@
                             <h6><i class="fas fa-cog"></i> Facebook Developers Console</h6>
                             <p><strong>1. Domínios do App:</strong></p>
                             <ul>
-                                <li><code>localhost</code></li>
-                                <li><code>127.0.0.1</code></li>
+                                <li><code>hashtag.betasolucao.com.br</code></li>
+                                <li><code>localhost</code> (para desenvolvimento)</li>
                             </ul>
                             
                             <p><strong>2. URLs de Política de Privacidade:</strong></p>
                             <ul>
-                                <li><code>{{ url('/privacidade') }}</code></li>
+                                <li><code>{{ str_replace('http://', 'https://', url('/privacidade')) }}</code></li>
                             </ul>
                             
                             <p><strong>3. URIs de Redirecionamento OAuth:</strong></p>
                             <ul>
                                 <li><code>{{ $platform->redirect_uri }}</code></li>
+                                @if(strpos($platform->redirect_uri, 'http://') === 0)
+                                    <li><code>{{ str_replace('http://', 'https://', $platform->redirect_uri) }}</code> <span class="badge bg-warning">HTTPS</span></li>
+                                @endif
                             </ul>
                             
                             <p><strong>4. URLs de Logout Válidos:</strong></p>
                             <ul>
-                                <li><code>{{ url('/') }}</code></li>
+                                <li><code>{{ str_replace('http://', 'https://', url('/')) }}</code></li>
                             </ul>
                         </div>
+                        
+                        @if(strpos($platform->redirect_uri, 'http://') === 0)
+                        <div class="alert alert-warning">
+                            <h6><i class="fas fa-exclamation-triangle"></i> ATENÇÃO - Problema de HTTPS!</h6>
+                            <p>Sua URL de callback está usando <strong>HTTP</strong>, mas o Facebook pode estar redirecionando para <strong>HTTPS</strong>.</p>
+                            <p><strong>Soluções:</strong></p>
+                            <ol>
+                                <li>Configure ambas as URLs (HTTP e HTTPS) no Facebook</li>
+                                <li>Ou atualize sua URL de callback para HTTPS</li>
+                            </ol>
+                        </div>
+                        @endif
                     </div>
                 </div>
                 
@@ -81,9 +96,14 @@
                     <a href="{{ route('platforms.show', $platform) }}" class="btn btn-secondary">
                         <i class="fas fa-arrow-left"></i> Voltar
                     </a>
-                    <a href="{{ route('platforms.connect', $platform) }}" class="btn btn-primary">
-                        <i class="fab fa-facebook"></i> Tentar Conectar Novamente
-                    </a>
+                    <div class="d-flex gap-2">
+                        <a href="{{ route('platforms.logs', $platform) }}" class="btn btn-info">
+                            <i class="fas fa-file-alt"></i> Ver Logs
+                        </a>
+                        <a href="{{ route('platforms.connect', $platform) }}" class="btn btn-primary">
+                            <i class="fab fa-facebook"></i> Tentar Conectar Novamente
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>

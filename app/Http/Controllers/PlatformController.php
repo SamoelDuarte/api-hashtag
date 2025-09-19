@@ -122,13 +122,48 @@ class PlatformController extends Controller
      */
     public function callback(Request $request, Platform $platform)
     {
+        // Log para debug - salvar todos os parâmetros recebidos
+        \Log::info('OAuth Callback recebido', [
+            'platform_id' => $platform->id,
+            'platform_type' => $platform->type,
+            'request_params' => $request->all(),
+            'request_url' => $request->fullUrl(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
+        // Verificar se houve erro na autorização
         if ($request->has('error')) {
+            \Log::warning('OAuth Error recebido', [
+                'error' => $request->get('error'),
+                'error_description' => $request->get('error_description'),
+                'platform_id' => $platform->id,
+            ]);
+            
             return redirect()->route('platforms.show', $platform)
                 ->with('error', 'Autorização negada: ' . $request->get('error_description'));
         }
 
-        if ($platform->type === 'facebook' && $request->has('code')) {
+        // Processar callback do Facebook
+        if ($platform->type === 'facebook') {
+            // Verificar se recebeu o código de autorização
+            if (!$request->has('code')) {
+                \Log::error('Callback sem código de autorização', [
+                    'platform_id' => $platform->id,
+                    'request_params' => $request->all(),
+                ]);
+                
+                return redirect()->route('platforms.show', $platform)
+                    ->with('error', 'Código de autorização não recebido. Parâmetros: ' . json_encode($request->all()));
+            }
+
             try {
+                // Log da tentativa de troca do código por token
+                \Log::info('Tentando trocar código por token', [
+                    'platform_id' => $platform->id,
+                    'code' => substr($request->get('code'), 0, 20) . '...',
+                    'redirect_uri' => $platform->redirect_uri,
+                ]);
+
                 // Trocar código por access token
                 $response = Http::get('https://graph.facebook.com/v21.0/oauth/access_token', [
                     'client_id' => $platform->app_id,
@@ -138,6 +173,12 @@ class PlatformController extends Controller
                 ]);
 
                 $data = $response->json();
+                
+                \Log::info('Resposta do Facebook', [
+                    'platform_id' => $platform->id,
+                    'status_code' => $response->status(),
+                    'response_data' => $data,
+                ]);
 
                 if (isset($data['access_token'])) {
                     $platform->update([
@@ -148,20 +189,44 @@ class PlatformController extends Controller
                             : null
                     ]);
 
+                    \Log::info('Token salvo com sucesso', [
+                        'platform_id' => $platform->id,
+                        'expires_at' => $platform->token_expires_at,
+                    ]);
+
                     return redirect()->route('platforms.show', $platform)
                         ->with('success', 'Conectado com sucesso ao Facebook/Instagram!');
                 } else {
+                    $errorMessage = $data['error']['message'] ?? 'Erro desconhecido';
+                    \Log::error('Erro ao obter token', [
+                        'platform_id' => $platform->id,
+                        'error_data' => $data,
+                    ]);
+                    
                     return redirect()->route('platforms.show', $platform)
-                        ->with('error', 'Erro ao obter token de acesso: ' . ($data['error']['message'] ?? 'Erro desconhecido'));
+                        ->with('error', 'Erro ao obter token de acesso: ' . $errorMessage . '. Debug: ' . json_encode($data));
                 }
             } catch (\Exception $e) {
+                \Log::error('Exceção no callback', [
+                    'platform_id' => $platform->id,
+                    'exception' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+                
                 return redirect()->route('platforms.show', $platform)
                     ->with('error', 'Erro na autenticação: ' . $e->getMessage());
             }
         }
 
+        // Se chegou até aqui, o callback é inválido
+        \Log::warning('Callback inválido', [
+            'platform_id' => $platform->id,
+            'platform_type' => $platform->type,
+            'request_params' => $request->all(),
+        ]);
+
         return redirect()->route('platforms.show', $platform)
-            ->with('error', 'Callback inválido.');
+            ->with('error', 'Callback inválido. Tipo: ' . $platform->type . ', Parâmetros: ' . json_encode($request->all()));
     }
 
     /**

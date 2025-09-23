@@ -61,7 +61,7 @@ class HashtagController extends Controller
 
             // 2. Obter páginas do Facebook
             $pagesResponse = Http::get('https://graph.facebook.com/v21.0/me/accounts', [
-                'fields' => 'id,name,access_token,perms,tasks',
+                'fields' => 'id,name,access_token,tasks',
                 'access_token' => $platform->access_token
             ]);
 
@@ -377,7 +377,7 @@ class HashtagController extends Controller
 
             // 4. Testar pages com fields detalhados
             $pagesDetailedResponse = Http::get('https://graph.facebook.com/v21.0/me/accounts', [
-                'fields' => 'id,name,access_token,perms,tasks,category,verification_status',
+                'fields' => 'id,name,access_token,tasks,category,verification_status',
                 'access_token' => $platform->access_token
             ]);
             

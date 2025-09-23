@@ -234,7 +234,7 @@ function testFacebookAPI() {
 
 // Testar especificamente o endpoint de páginas
 function testFacebookPages() {
-    fetch(`https://graph.facebook.com/v21.0/me/accounts?access_token={{ $platform->access_token }}&fields=id,name,perms,tasks`)
+    fetch(`https://graph.facebook.com/v21.0/me/accounts?access_token={{ $platform->access_token }}&fields=id,name,tasks`)
         .then(response => response.json())
         .then(data => {
             console.log('Facebook Pages Test:', data);

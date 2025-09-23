@@ -422,7 +422,11 @@ function loadAccounts() {
 
 function makeAccountsRequest() {
     const platformId = {{ $platform->id }};
-    const url = `/platforms/${platformId}/hashtags/accounts`;
+    
+    // *** TESTE: Usar rota alternativa mais simples ***
+    const url = `/api/platform/${platformId}/accounts`;
+    console.log('🔄 TESTANDO ROTA ALTERNATIVA:', url);
+    
     const container = document.getElementById('accounts-container');
     const loading = document.getElementById('loading-accounts');
     

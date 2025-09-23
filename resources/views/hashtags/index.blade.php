@@ -382,8 +382,23 @@ function loadAccounts() {
     container.style.display = 'none';
     loading.style.display = 'block';
     
-    fetch(`/platforms/{{ $platform->id }}/hashtags/accounts`)
-        .then(response => response.json())
+    // Debug: mostrar qual URL está sendo chamada
+    const url = `/platforms/{{ $platform->id }}/hashtags/accounts`;
+    console.log('Chamando URL:', window.location.origin + url);
+    
+    fetch(url)
+        .then(response => {
+            console.log('Response status:', response.status);
+            console.log('Response headers:', [...response.headers.entries()]);
+            
+            // Verificar se a resposta é JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error(`Resposta não é JSON. Content-Type: ${contentType}`);
+            }
+            
+            return response.json();
+        })
         .then(data => {
             loading.style.display = 'none';
             container.style.display = 'block';
@@ -454,11 +469,30 @@ function loadAccounts() {
         .catch(error => {
             loading.style.display = 'none';
             container.style.display = 'block';
+            
+            console.error('Erro completo:', error);
+            
+            let errorMessage = error.message;
+            if (error.message.includes('Resposta não é JSON')) {
+                errorMessage += '<br><strong>Isso indica que o Laravel não está processando a rota corretamente.</strong>';
+                errorMessage += '<br>Verifique se o servidor web está configurado para o Laravel.';
+            }
+            
             container.innerHTML = `
                 <div class="alert alert-danger">
                     <h6><i class="bi bi-exclamation-triangle"></i> Erro de Conexão</h6>
-                    <p><strong>Erro:</strong> ${error}</p>
-                    <p>Não foi possível conectar com a API. Verifique sua conexão de internet e tente novamente.</p>
+                    <p><strong>Erro:</strong> ${errorMessage}</p>
+                    <p><strong>URL chamada:</strong> ${window.location.origin}/platforms/{{ $platform->id }}/hashtags/accounts</p>
+                    <hr>
+                    <p><strong>Possíveis causas:</strong></p>
+                    <ul>
+                        <li>Laravel não está processando as rotas (verifique o .htaccess)</li>
+                        <li>DocumentRoot do servidor não aponta para a pasta 'public'</li>
+                        <li>Servidor web retornando página HTML em vez de JSON</li>
+                    </ul>
+                    <button class="btn btn-outline-info btn-sm" onclick="testLaravelConnection()">
+                        <i class="bi bi-arrow-clockwise"></i> Testar Conexão Laravel
+                    </button>
                 </div>
             `;
             
@@ -778,6 +812,26 @@ function displayMentionsResults(data, type) {
     }
     
     resultsDiv.innerHTML = html;
+}
+
+// Testar se Laravel está funcionando
+function testLaravelConnection() {
+    showAlert('Testando conexão com Laravel...', 'info');
+    
+    fetch('/test-laravel')
+        .then(response => {
+            console.log('Test Laravel response status:', response.status);
+            console.log('Test Laravel headers:', [...response.headers.entries()]);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Test Laravel data:', data);
+            showAlert(`Laravel OK! Env: ${data.env}, URL: ${data.url}`, 'success');
+        })
+        .catch(error => {
+            console.error('Laravel test error:', error);
+            showAlert('Laravel não está funcionando corretamente: ' + error.message, 'danger');
+        });
 }
 
 // Função para mostrar/ocultar debug info

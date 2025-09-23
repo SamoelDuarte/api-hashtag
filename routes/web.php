@@ -8,6 +8,16 @@ Route::get('/', function () {
     return redirect()->route('platforms.index');
 });
 
+// Rota de teste
+Route::get('/test-laravel', function () {
+    return response()->json([
+        'status' => 'Laravel funcionando!',
+        'timestamp' => now(),
+        'url' => config('app.url'),
+        'env' => config('app.env')
+    ]);
+});
+
 // Rotas do CRUD de plataformas
 Route::resource('platforms', PlatformController::class);
 

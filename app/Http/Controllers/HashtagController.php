@@ -27,7 +27,6 @@ class HashtagController extends Controller
      */
     public function getAccountIds(Platform $platform)
     {
-        dd('aki');
         if (!$platform->is_connected || !$platform->access_token) {
             return response()->json([
                 'error' => 'Plataforma não conectada',
@@ -41,7 +40,7 @@ class HashtagController extends Controller
 
         try {
             // 1. Primeiro testar se o token funciona com uma chamada simples
-            $meResponse = Http::get('https://graph.facebook.com/v21.0/me', [
+            $meResponse = Http::get(url: 'https://graph.facebook.com/v21.0/me', [
                 'fields' => 'id,name',
                 'access_token' => $platform->access_token
             ]);

@@ -383,8 +383,19 @@ function loadAccounts() {
     loading.style.display = 'block';
     
     // Debug: mostrar qual URL está sendo chamada
-    const url = `/platforms/{{ $platform->id }}/hashtags/accounts`;
+    const platformId = {{ $platform->id }};
+    const url = `/platforms/${platformId}/hashtags/accounts`;
+    console.log('Platform ID:', platformId);
     console.log('Chamando URL:', window.location.origin + url);
+    
+    // VERIFICAÇÃO: Se o ID for inválido, mostrar erro
+    if (!platformId || platformId === 'undefined') {
+        console.error('ERRO: Platform ID é inválido:', platformId);
+        loading.style.display = 'none';
+        container.innerHTML = '<div class="alert alert-danger">Erro: ID da plataforma inválido</div>';
+        container.style.display = 'block';
+        return;
+    }
     
     fetch(url)
         .then(response => {

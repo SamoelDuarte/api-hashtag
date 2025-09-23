@@ -217,9 +217,6 @@ Route::get('platforms/{platform}/logs', function (App\Models\Platform $platform)
 // Rota para política de privacidade
 Route::view('/privacidade', 'privacy')->name('privacy');
 
-// Rota ALTERNATIVA para testar nginx - URL mais simples
-Route::get('/api/platform/{platform}/accounts', [App\Http\Controllers\HashtagController::class, 'getAccountIds'])->name('api.platform.accounts');
-
 // Rotas para monitoramento de hashtags
 use App\Http\Controllers\HashtagController;
 

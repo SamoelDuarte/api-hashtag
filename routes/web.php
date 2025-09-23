@@ -178,4 +178,7 @@ Route::prefix('platforms/{platform}/hashtags')->name('hashtags.')->group(functio
     
     // Teste da API
     Route::get('/test-api', [HashtagController::class, 'testApi'])->name('test-api');
+    
+    // Debug completo do Facebook
+    Route::get('/debug-facebook', [HashtagController::class, 'debugFacebook'])->name('debug-facebook');
 });

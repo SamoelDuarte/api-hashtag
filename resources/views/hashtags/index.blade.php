@@ -48,9 +48,17 @@
                                     </div>
                                 @endif
                                 <div class="ms-auto">
-                                    <button class="btn btn-outline-primary btn-sm" onclick="testConnection()">
-                                        <i class="bi bi-arrow-clockwise"></i> Testar Conexão
-                                    </button>
+                                    <div class="btn-group">
+                                        <button class="btn btn-outline-primary btn-sm" onclick="testConnection()">
+                                            <i class="bi bi-arrow-clockwise"></i> Testar Conexão
+                                        </button>
+                                        <button class="btn btn-outline-info btn-sm" onclick="testFacebookAPI()">
+                                            <i class="bi bi-facebook"></i> Testar Facebook API
+                                        </button>
+                                        <button class="btn btn-outline-warning btn-sm" onclick="debugFacebookComplete()">
+                                            <i class="bi bi-bug"></i> Debug Completo
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -199,6 +207,173 @@ function testConnection() {
         });
 }
 
+// Testar Facebook API diretamente
+function testFacebookAPI() {
+    showAlert('Testando Facebook API...', 'info');
+    
+    // Fazer chamada direta para testar o token
+    fetch(`https://graph.facebook.com/v21.0/me?access_token={{ $platform->access_token }}&fields=id,name`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Facebook API Test:', data);
+            
+            if (data.error) {
+                showAlert(`Erro no Facebook API: ${data.error.message}`, 'danger');
+            } else {
+                showAlert(`Facebook API OK! Usuário: ${data.name} (ID: ${data.id})`, 'success');
+                
+                // Agora testar pages
+                testFacebookPages();
+            }
+        })
+        .catch(error => {
+            showAlert('Erro ao conectar com Facebook API: ' + error, 'danger');
+            console.error('Facebook API Error:', error);
+        });
+}
+
+// Testar especificamente o endpoint de páginas
+function testFacebookPages() {
+    fetch(`https://graph.facebook.com/v21.0/me/accounts?access_token={{ $platform->access_token }}&fields=id,name,perms,tasks`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Facebook Pages Test:', data);
+            
+            if (data.error) {
+                showAlert(`Erro ao buscar páginas: ${data.error.message}`, 'danger');
+            } else {
+                const pages = data.data || [];
+                if (pages.length === 0) {
+                    showAlert('Facebook API funciona, mas não retornou páginas. Verifique permissões ou se o usuário gerencia páginas.', 'warning');
+                } else {
+                    showAlert(`Encontradas ${pages.length} páginas via Facebook API direta!`, 'success');
+                }
+            }
+        })
+        .catch(error => {
+            showAlert('Erro ao testar páginas do Facebook: ' + error, 'danger');
+            console.error('Facebook Pages Error:', error);
+        });
+}
+
+// Debug completo do Facebook
+function debugFacebookComplete() {
+    showAlert('Executando debug completo do Facebook...', 'info');
+    
+    fetch(`/platforms/{{ $platform->id }}/hashtags/debug-facebook`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Debug Completo:', data);
+            
+            if (data.success) {
+                // Mostrar modal com resultados detalhados
+                showDebugModal(data);
+                
+                // Mostrar resumo das recomendações
+                const recommendations = data.recommendations || [];
+                if (recommendations.length > 0) {
+                    const firstRecommendation = recommendations[0];
+                    showAlert(`Debug concluído. ${firstRecommendation}`, 
+                             firstRecommendation.includes('Todos os testes passaram') ? 'success' : 'warning');
+                }
+            } else {
+                showAlert(`Erro no debug: ${data.error}`, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('Erro ao executar debug: ' + error, 'danger');
+            console.error('Debug Error:', error);
+        });
+}
+
+// Mostrar modal com resultados do debug
+function showDebugModal(debugData) {
+    // Criar modal dinamicamente
+    const modalId = 'debugModal';
+    const existingModal = document.getElementById(modalId);
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.id = modalId;
+    modal.innerHTML = `
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-bug"></i> Debug Completo do Facebook
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Informações da Plataforma</h6>
+                            <pre class="bg-light p-2 rounded small">${JSON.stringify(debugData.platform_info, null, 2)}</pre>
+                            
+                            <h6 class="mt-3">Recomendações</h6>
+                            <ul class="list-group">
+                                ${debugData.recommendations.map(rec => `<li class="list-group-item">${rec}</li>`).join('')}
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Resultados dos Testes</h6>
+                            <div class="accordion" id="testAccordion">
+                                ${Object.entries(debugData.tests).map(([key, test], index) => `
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header">
+                                            <button class="accordion-button ${index === 0 ? '' : 'collapsed'}" type="button" 
+                                                    data-bs-toggle="collapse" data-bs-target="#test-${index}">
+                                                ${key.replace('_', ' ').toUpperCase()} 
+                                                <span class="badge ${test.success ? 'bg-success' : 'bg-danger'} ms-2">
+                                                    ${test.success ? 'OK' : 'ERRO'}
+                                                </span>
+                                            </button>
+                                        </h2>
+                                        <div id="test-${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" 
+                                             data-bs-parent="#testAccordion">
+                                            <div class="accordion-body">
+                                                <small><strong>Status:</strong> ${test.status}</small>
+                                                <pre class="bg-light p-2 rounded small mt-2">${JSON.stringify(test.data, null, 2)}</pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="button" class="btn btn-primary" onclick="copyDebugInfo()">
+                        <i class="bi bi-clipboard"></i> Copiar Informações
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Salvar dados para cópia
+    window.lastFullDebugInfo = debugData;
+    
+    // Mostrar modal
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+}
+
+// Copiar informações de debug
+function copyDebugInfo() {
+    if (window.lastFullDebugInfo) {
+        navigator.clipboard.writeText(JSON.stringify(window.lastFullDebugInfo, null, 2))
+            .then(() => showAlert('Informações de debug copiadas!', 'success'))
+            .catch(() => showAlert('Erro ao copiar informações', 'danger'));
+    }
+}
+
 // Carregar contas (páginas e Instagram)
 function loadAccounts() {
     const container = document.getElementById('accounts-container');
@@ -213,18 +388,67 @@ function loadAccounts() {
             loading.style.display = 'none';
             container.style.display = 'block';
             
+            // Log completo para debug
+            console.log('Response completa da API:', data);
+            
             if (data.success) {
                 platformData.accounts = data.data;
                 displayAccounts(data.data);
                 enableControls();
                 showAlert('Contas carregadas com sucesso!', 'success');
+                
+                // Mostrar debug info se disponível
+                if (data.debug) {
+                    console.log('Debug info:', data.debug);
+                }
             } else {
-                container.innerHTML = `
+                // Mostrar erro detalhado
+                let errorHtml = `
                     <div class="alert alert-danger">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        Erro ao carregar contas: ${data.error}
-                    </div>
+                        <h6><i class="bi bi-exclamation-triangle"></i> Erro ao carregar contas</h6>
+                        <p><strong>Erro:</strong> ${data.error}</p>
                 `;
+                
+                // Mostrar mensagem adicional se existir
+                if (data.message) {
+                    errorHtml += `<p><strong>Detalhes:</strong> ${data.message}</p>`;
+                }
+                
+                // Mostrar sugestões se existirem
+                if (data.suggestions && data.suggestions.length > 0) {
+                    errorHtml += `
+                        <hr>
+                        <p><strong>Possíveis soluções:</strong></p>
+                        <ul>
+                    `;
+                    data.suggestions.forEach(suggestion => {
+                        errorHtml += `<li>${suggestion}</li>`;
+                    });
+                    errorHtml += `</ul>`;
+                }
+                
+                // Botão para mostrar debug
+                if (data.debug) {
+                    errorHtml += `
+                        <hr>
+                        <button class="btn btn-outline-info btn-sm" onclick="showDebugInfo()">
+                            <i class="bi bi-bug"></i> Mostrar Informações Técnicas
+                        </button>
+                        <div id="debug-info" style="display: none;" class="mt-3">
+                            <h6>Informações de Debug:</h6>
+                            <pre class="bg-light p-2 rounded small">${JSON.stringify(data.debug, null, 2)}</pre>
+                        </div>
+                    `;
+                    
+                    // Salvar debug info globalmente
+                    window.lastDebugInfo = data.debug;
+                }
+                
+                errorHtml += `</div>`;
+                container.innerHTML = errorHtml;
+                
+                // Log do erro para análise
+                console.error('Erro na API de contas:', data);
             }
         })
         .catch(error => {
@@ -232,10 +456,13 @@ function loadAccounts() {
             container.style.display = 'block';
             container.innerHTML = `
                 <div class="alert alert-danger">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    Erro de conexão: ${error}
+                    <h6><i class="bi bi-exclamation-triangle"></i> Erro de Conexão</h6>
+                    <p><strong>Erro:</strong> ${error}</p>
+                    <p>Não foi possível conectar com a API. Verifique sua conexão de internet e tente novamente.</p>
                 </div>
             `;
+            
+            console.error('Erro de conexão:', error);
         });
 }
 
@@ -551,6 +778,14 @@ function displayMentionsResults(data, type) {
     }
     
     resultsDiv.innerHTML = html;
+}
+
+// Função para mostrar/ocultar debug info
+function showDebugInfo() {
+    const debugDiv = document.getElementById('debug-info');
+    if (debugDiv) {
+        debugDiv.style.display = debugDiv.style.display === 'none' ? 'block' : 'none';
+    }
 }
 
 // Função para mostrar alertas

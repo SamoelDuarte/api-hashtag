@@ -490,9 +490,20 @@ function loadAccounts() {
                         <li>DocumentRoot do servidor não aponta para a pasta 'public'</li>
                         <li>Servidor web retornando página HTML em vez de JSON</li>
                     </ul>
-                    <button class="btn btn-outline-info btn-sm" onclick="testLaravelConnection()">
-                        <i class="bi bi-arrow-clockwise"></i> Testar Conexão Laravel
-                    </button>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-info btn-sm" onclick="testLaravelConnection()">
+                            <i class="bi bi-arrow-clockwise"></i> 1. Testar Laravel Básico
+                        </button>
+                        <button class="btn btn-outline-warning btn-sm" onclick="testAccountsDebug()">
+                            <i class="bi bi-bug"></i> 2. Testar Rota Debug
+                        </button>
+                        <button class="btn btn-outline-primary btn-sm" onclick="testModelBinding()">
+                            <i class="bi bi-database"></i> 3. Testar Model Binding
+                        </button>
+                        <button class="btn btn-outline-success btn-sm" onclick="testHashtagsRoute()">
+                            <i class="bi bi-hash"></i> 4. Testar Rotas Hashtags
+                        </button>
+                    </div>
                 </div>
             `;
             
@@ -831,6 +842,63 @@ function testLaravelConnection() {
         .catch(error => {
             console.error('Laravel test error:', error);
             showAlert('Laravel não está funcionando corretamente: ' + error.message, 'danger');
+        });
+}
+
+// Testar rota de debug específica
+function testAccountsDebug() {
+    showAlert('Testando rota de debug...', 'info');
+    
+    fetch('/platforms/{{ $platform->id }}/hashtags/accounts-debug')
+        .then(response => {
+            console.log('Debug route response:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Debug route data:', data);
+            showAlert('Rota de debug funcionando! O problema pode estar no controller.', 'success');
+        })
+        .catch(error => {
+            console.error('Debug route error:', error);
+            showAlert('Rota de debug falhou: ' + error.message, 'danger');
+        });
+}
+
+// Testar model binding
+function testModelBinding() {
+    showAlert('Testando model binding...', 'info');
+    
+    fetch('/platforms/{{ $platform->id }}/test-binding')
+        .then(response => {
+            console.log('Model binding response:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Model binding data:', data);
+            showAlert(`Model binding OK! Platform: ${data.platform_name}`, 'success');
+        })
+        .catch(error => {
+            console.error('Model binding error:', error);
+            showAlert('Model binding falhou: ' + error.message, 'danger');
+        });
+}
+
+// Testar rotas de hashtags gerais
+function testHashtagsRoute() {
+    showAlert('Testando rotas de hashtags...', 'info');
+    
+    fetch('/test-hashtags-route')
+        .then(response => {
+            console.log('Hashtags route response:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Hashtags route data:', data);
+            showAlert('Rotas de hashtags disponíveis! Problema específico na rota /accounts.', 'warning');
+        })
+        .catch(error => {
+            console.error('Hashtags route error:', error);
+            showAlert('Rotas de hashtags falharam: ' + error.message, 'danger');
         });
 }
 

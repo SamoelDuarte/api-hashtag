@@ -18,6 +18,53 @@ Route::get('/test-laravel', function () {
     ]);
 });
 
+// Rota de teste específica para hashtags
+Route::get('/test-hashtags-route', function () {
+    return response()->json([
+        'status' => 'Rota de hashtags funcionando!',
+        'timestamp' => now(),
+        'available_routes' => [
+            'GET /platforms/{id}/hashtags',
+            'GET /platforms/{id}/hashtags/accounts',
+            'GET /platforms/{id}/hashtags/dashboard',
+            'POST /platforms/{id}/hashtags/search',
+        ]
+    ]);
+});
+
+// Rota de teste direto para accounts (sem precisar de plataforma)
+Route::get('/test-accounts', function () {
+    return response()->json([
+        'status' => 'Endpoint accounts funcionando!',
+        'message' => 'Se você vê esta mensagem, as rotas estão funcionando',
+        'timestamp' => now()
+    ]);
+});
+
+// Rota de debug que imita a rota problemática
+Route::get('/platforms/1/hashtags/accounts-debug', function () {
+    return response()->json([
+        'status' => 'Debug da rota accounts funcionando!',
+        'message' => 'Esta é uma rota de teste que imita /platforms/1/hashtags/accounts',
+        'original_route' => '/platforms/1/hashtags/accounts',
+        'debug_route' => '/platforms/1/hashtags/accounts-debug',
+        'timestamp' => now(),
+        'note' => 'Se esta rota funciona, o problema pode estar no método getAccountIds do controller'
+    ]);
+});
+
+// Rota para testar model binding
+Route::get('/platforms/{platform}/test-binding', function (App\Models\Platform $platform) {
+    return response()->json([
+        'status' => 'Model binding funcionando!',
+        'platform_id' => $platform->id,
+        'platform_name' => $platform->name,
+        'platform_type' => $platform->type,
+        'is_connected' => $platform->is_connected,
+        'message' => 'Se você vê esta mensagem, o model binding está funcionando'
+    ]);
+});
+
 // Rotas do CRUD de plataformas
 Route::resource('platforms', PlatformController::class);
 

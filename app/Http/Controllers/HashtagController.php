@@ -27,6 +27,7 @@ class HashtagController extends Controller
      */
     public function getAccountIds(Platform $platform)
     {
+        dd('aki');
         if (!$platform->is_connected || !$platform->access_token) {
             return response()->json([
                 'error' => 'Plataforma não conectada',

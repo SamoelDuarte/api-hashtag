@@ -27,8 +27,15 @@ class HashtagController extends Controller
      */
     public function getAccountIds(Platform $platform)
     {
+        // *** DEBUG: Log de entrada ***
+        Log::info('=== GETACCOUNTIDS INICIADO ===', [
+            'platform_id' => $platform->id,
+            'is_connected' => $platform->is_connected,
+            'has_token' => !empty($platform->access_token)
+        ]);
        
         if (!$platform->is_connected || !$platform->access_token) {
+            Log::info('Plataforma não conectada - retornando 400');
             return response()->json([
                 'error' => 'Plataforma não conectada',
                 'debug' => [
@@ -40,6 +47,7 @@ class HashtagController extends Controller
         }
 
         try {
+            Log::info('Testando token com /me');
             // 1. Primeiro testar se o token funciona com uma chamada simples
             $meResponse = Http::get('https://graph.facebook.com/v21.0/me', [
                 'fields' => 'id,name',
@@ -53,13 +61,17 @@ class HashtagController extends Controller
                 'token_used' => substr($platform->access_token, 0, 20) . '...'
             ];
 
+            Log::info('Resposta do /me', $debugInfo);
+
             if (!$meResponse->successful()) {
+                Log::info('Token inválido - retornando 400');
                 return response()->json([
                     'error' => 'Token inválido ou expirado',
                     'debug' => $debugInfo
                 ], 400);
             }
 
+            Log::info('Buscando páginas com /me/accounts');
             // 2. Obter páginas do Facebook
             $pagesResponse = Http::get('https://graph.facebook.com/v21.0/me/accounts', [
                 'fields' => 'id,name,access_token,tasks',
@@ -70,7 +82,14 @@ class HashtagController extends Controller
             $debugInfo['pages_response_success'] = $pagesResponse->successful();
             $debugInfo['pages_response_body'] = $pagesResponse->json();
 
+            Log::info('Resposta do /me/accounts', [
+                'status' => $pagesResponse->status(),
+                'success' => $pagesResponse->successful(),
+                'body' => $pagesResponse->json()
+            ]);
+
             if (!$pagesResponse->successful()) {
+                Log::info('Erro ao obter páginas - retornando 400');
                 return response()->json([
                     'error' => 'Erro ao obter páginas do Facebook',
                     'debug' => $debugInfo
@@ -83,8 +102,14 @@ class HashtagController extends Controller
             $debugInfo['pages_count'] = count($pages);
             $debugInfo['pages_raw'] = $pagesData;
 
-            // Se não tem páginas, retornar erro detalhado
+            Log::info('Páginas encontradas', [
+                'count' => count($pages),
+                'pages' => $pages
+            ]);
+
+            // *** PONTO CRÍTICO: Aqui pode estar o 404 ***
             if (empty($pages)) {
+                Log::warning('=== RETORNANDO 404 - NENHUMA PÁGINA ENCONTRADA ===');
                 return response()->json([
                     'error' => 'Nenhuma página encontrada',
                     'message' => 'Este usuário não gerencia nenhuma página do Facebook ou não concedeu a permissão pages_show_list',
@@ -98,10 +123,12 @@ class HashtagController extends Controller
                 ], 404);
             }
 
+            Log::info('Processando Instagram Business para cada página');
             $accountData = ['pages' => $pages];
 
             // 3. Para cada página, verificar se tem Instagram Business vinculado
             foreach ($pages as $index => $page) {
+                Log::info("Verificando Instagram para página {$page['id']}");
                 $instagramResponse = Http::get("https://graph.facebook.com/v21.0/{$page['id']}", [
                     'fields' => 'instagram_business_account',
                     'access_token' => $platform->access_token
@@ -111,17 +138,37 @@ class HashtagController extends Controller
                     $instagram = $instagramResponse->json();
                     if (isset($instagram['instagram_business_account'])) {
                         $accountData['pages'][$index]['instagram_business_account'] = $instagram['instagram_business_account'];
+                        Log::info("Instagram Business encontrado para página {$page['id']}", $instagram['instagram_business_account']);
                     }
+                } else {
+                    Log::warning("Erro ao buscar Instagram para página {$page['id']}", [
+                        'status' => $instagramResponse->status(),
+                        'response' => $instagramResponse->json()
+                    ]);
                 }
             }
 
+            Log::info('Tentando salvar extra_data na plataforma');
             // Salvar dados extras na plataforma
-            $platform->update([
-                'extra_data' => array_merge($platform->extra_data ?? [], [
-                    'account_data' => $accountData,
-                    'last_sync' => now()->toISOString(),
-                    'last_debug' => $debugInfo
-                ])
+            try {
+                $platform->update([
+                    'extra_data' => array_merge($platform->extra_data ?? [], [
+                        'account_data' => $accountData,
+                        'last_sync' => now()->toISOString(),
+                        'last_debug' => $debugInfo
+                    ])
+                ]);
+                Log::info('Extra_data salvo com sucesso');
+            } catch (\Exception $updateException) {
+                Log::error('Erro ao salvar extra_data', [
+                    'error' => $updateException->getMessage(),
+                    'trace' => $updateException->getTraceAsString()
+                ]);
+                // Continua mesmo se falhar para salvar
+            }
+
+            Log::info('=== RETORNANDO SUCESSO 200 ===', [
+                'account_data' => $accountData
             ]);
 
             return response()->json([
@@ -131,10 +178,12 @@ class HashtagController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Erro ao obter IDs da conta', [
+            Log::error('=== EXCEPTION CAPTURADA - RETORNANDO 500 ===', [
                 'platform_id' => $platform->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
             ]);
 
             return response()->json([

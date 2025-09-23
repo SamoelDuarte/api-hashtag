@@ -76,7 +76,7 @@ class HashtagController extends Controller
             }
 
             // 3. Obter páginas do Facebook
-            $pagesResponse = Http::get('https://graph.facebook.com/v21.0/me/accounts', [
+            $pagesResponse = Http::get('https://graph.facebook.com/v23.0/me/accounts', [
                 'fields' => 'id,name,access_token,tasks',
                 'access_token' => $platform->access_token
             ]);
@@ -98,27 +98,32 @@ class HashtagController extends Controller
             $debugInfo['pages_count'] = count($pages);
             $debugInfo['pages_raw'] = $pagesData;
 
-            // Se não tem páginas, retornar erro detalhado com debug de permissões
+            $accountData = ['pages' => $pages];
+
+            // Se não tem páginas, ainda retornar sucesso mas com informações de diagnóstico
             if (empty($pages)) {
-                return response()->json([
-                    'error' => 'Nenhuma página encontrada',
-                    'message' => 'Este usuário não gerencia nenhuma página do Facebook ou não tem as permissões necessárias',
-                    'debug' => $debugInfo,
+                $debugInfo['diagnosis'] = [
+                    'issue' => 'Nenhuma página encontrada',
+                    'possible_causes' => [
+                        'missing_pages_permission' => !in_array('pages_show_list', $permissions),
+                        'no_pages_managed' => 'Usuário não é admin/editor de nenhuma página',
+                        'app_in_development' => 'App pode estar em modo desenvolvimento',
+                        'app_needs_review' => 'App pode precisar de revisão do Facebook'
+                    ],
                     'solutions' => [
-                        'missing_pages_permission' => !in_array('pages_show_list', $permissions) ? 'Reconecte o app solicitando a permissão "pages_show_list"' : null,
-                        'no_pages_managed' => 'Certifique-se de ser admin/editor de pelo menos uma página do Facebook',
-                        'app_review_needed' => 'Se o app está em modo Live, pode precisar de revisão do Facebook',
-                        'test_users' => 'Use usuários que sejam Desenvolvedores/Testadores do app durante desenvolvimento'
+                        'create_page' => 'Criar uma página de teste no Facebook',
+                        'add_permission' => 'Reconectar com permissão pages_show_list',
+                        'add_to_app' => 'Adicionar usuário como Desenvolvedor/Testador do app',
+                        'check_app_mode' => 'Verificar se app está em modo Live ou Development'
                     ],
                     'next_steps' => [
-                        '1. Verificar se você é administrador de alguma página do Facebook',
-                        '2. Reconectar o app com permissão "pages_show_list"',
-                        '3. Se necessário, adicionar seu usuário como Desenvolvedor/Tester no app'
+                        '1. Verificar permissões concedidas acima',
+                        '2. Criar ou ter acesso a uma página do Facebook',
+                        '3. Reconectar se necessário',
+                        '4. Verificar modo do app no Facebook Developers'
                     ]
-                ], 404);
+                ];
             }
-
-            $accountData = ['pages' => $pages];
 
             // 4. Para cada página, verificar se tem Instagram Business vinculado
             foreach ($pages as $index => $page) {
@@ -152,9 +157,10 @@ class HashtagController extends Controller
             }
 
             return response()->json([
-                'success' => true,
+                'success' => count($pages) > 0,
                 'data' => $accountData,
-                'debug' => $debugInfo
+                'debug' => $debugInfo,
+                'message' => count($pages) > 0 ? 'Páginas encontradas com sucesso' : 'Nenhuma página encontrada - veja debug para mais detalhes'
             ]);
 
         } catch (\Exception $e) {
@@ -165,13 +171,17 @@ class HashtagController extends Controller
             ]);
 
             return response()->json([
-                'error' => 'Erro interno: ' . $e->getMessage(),
+                'success' => false,
+                'data' => null,
+                'error' => 'Erro interno capturado',
                 'debug' => [
                     'exception_message' => $e->getMessage(),
                     'exception_file' => $e->getFile(),
-                    'exception_line' => $e->getLine()
-                ]
-            ], 500);
+                    'exception_line' => $e->getLine(),
+                    'exception_trace' => $e->getTraceAsString()
+                ],
+                'message' => 'Erro interno - veja debug para detalhes'
+            ]);
         }
     }
 

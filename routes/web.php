@@ -239,3 +239,13 @@ Route::prefix('platforms/{platform}/hashtags')->name('hashtags.')->group(functio
     // Debug completo do Facebook
     Route::get('/debug-facebook', [HashtagController::class, 'debugFacebook'])->name('debug-facebook');
 });
+
+// Rota de teste simples para verificar se está funcionando
+Route::get('/platforms/{platform}/hashtags/accounts-simple', function ($platform) {
+    return response()->json([
+        'status' => 'Rota funcionando!',
+        'platform_id' => $platform,
+        'timestamp' => now(),
+        'message' => 'Se você vê esta mensagem, o problema pode estar no method binding ou no controller'
+    ]);
+});

@@ -396,16 +396,74 @@ function loadAccounts() {
         container.style.display = 'block';
         return;
     }
+
+    // *** DEBUG: Testar se alguma rota básica funciona ***
+    console.log('🔍 Testando rotas básicas primeiro...');
+    fetch('/test-laravel')
+        .then(resp => resp.json())
+        .then(data => {
+            console.log('✅ /test-laravel funciona:', data);
+            
+            // Testar rota específica de plataformas
+            return fetch(`/platforms/${platformId}`);
+        })
+        .then(resp => {
+            console.log(`✅ /platforms/${platformId} status:`, resp.status);
+            
+            // Agora fazer a requisição real
+            console.log('🎯 Fazendo requisição para accounts...');
+            makeAccountsRequest();
+        })
+        .catch(err => {
+            console.log('❌ Erro nos testes básicos:', err);
+            makeAccountsRequest(); // Fazer mesmo assim
+        });
+}
+
+function makeAccountsRequest() {
+    const platformId = {{ $platform->id }};
+    const url = `/platforms/${platformId}/hashtags/accounts`;
+    const container = document.getElementById('accounts-container');
+    const loading = document.getElementById('loading-accounts');
     
     fetch(url)
         .then(response => {
             console.log('Response status:', response.status);
             console.log('Response headers:', [...response.headers.entries()]);
             
+            // *** DEBUG: Mostrar o conteúdo HTML completo ***
+            if (response.status === 404) {
+                return response.text().then(htmlContent => {
+                    console.log('=== CONTEÚDO HTML COMPLETO DO ERRO 404 ===');
+                    console.log(htmlContent);
+                    
+                    // Procurar por pistas no HTML
+                    if (htmlContent.includes('404')) {
+                        console.log('✅ É realmente um erro 404');
+                    }
+                    if (htmlContent.includes('NotFoundHttpException')) {
+                        console.log('✅ Laravel NotFoundHttpException');
+                    }
+                    if (htmlContent.includes('Route [') && htmlContent.includes('] not defined')) {
+                        console.log('✅ Erro de rota não definida');
+                    }
+                    if (htmlContent.includes('nginx')) {
+                        console.log('❌ Erro do Nginx, não do Laravel');
+                    }
+                    
+                    throw new Error(`404 Error - HTML Response: ${htmlContent.substring(0, 500)}...`);
+                });
+            }
+            
             // Verificar se a resposta é JSON
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
-                throw new Error(`Resposta não é JSON. Content-Type: ${contentType}`);
+                return response.text().then(textContent => {
+                    console.log('=== RESPOSTA NÃO-JSON ===');
+                    console.log('Content-Type:', contentType);
+                    console.log('Conteúdo:', textContent);
+                    throw new Error(`Resposta não é JSON. Content-Type: ${contentType}`);
+                });
             }
             
             return response.json();

@@ -159,3 +159,23 @@ Route::get('platforms/{platform}/logs', function (App\Models\Platform $platform)
 
 // Rota para política de privacidade
 Route::view('/privacidade', 'privacy')->name('privacy');
+
+// Rotas para monitoramento de hashtags
+use App\Http\Controllers\HashtagController;
+
+Route::prefix('platforms/{platform}/hashtags')->name('hashtags.')->group(function () {
+    // Página principal de monitoramento
+    Route::get('/', [HashtagController::class, 'index'])->name('index');
+    
+    // Dashboard de monitoramento
+    Route::get('/dashboard', [HashtagController::class, 'dashboard'])->name('dashboard');
+    
+    // APIs para obter dados
+    Route::get('/accounts', [HashtagController::class, 'getAccountIds'])->name('accounts');
+    Route::post('/search', [HashtagController::class, 'searchHashtags'])->name('search');
+    Route::post('/mentions', [HashtagController::class, 'getMentions'])->name('mentions');
+    Route::post('/facebook-mentions', [HashtagController::class, 'getFacebookMentions'])->name('facebook-mentions');
+    
+    // Teste da API
+    Route::get('/test-api', [HashtagController::class, 'testApi'])->name('test-api');
+});

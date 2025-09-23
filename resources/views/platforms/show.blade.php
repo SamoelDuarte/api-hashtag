@@ -102,6 +102,15 @@
                         Plataforma conectada com sucesso!
                     </div>
                     
+                    <!-- Monitoramento de Hashtags -->
+                    <a href="{{ route('hashtags.index', $platform) }}" class="btn btn-primary w-100 mb-2">
+                        <i class="bi bi-hash"></i> Monitorar Hashtags
+                    </a>
+                    
+                    <a href="{{ route('hashtags.dashboard', $platform) }}" class="btn btn-info w-100 mb-2">
+                        <i class="bi bi-speedometer2"></i> Dashboard
+                    </a>
+                    
                     <form action="{{ route('platforms.disconnect', $platform) }}" method="POST" class="mb-2">
                         @csrf
                         <button type="submit" class="btn btn-warning w-100" 

@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Http;
 use App\Http\Controllers\PlatformController;
 
 // Redirecionar para plataformas
@@ -221,6 +222,68 @@ Route::get('platforms/{platform}/logs', function (App\Models\Platform $platform)
 
 // Rota para política de privacidade
 Route::view('/privacidade', 'privacy')->name('privacy');
+
+// Rota para verificar status do token Facebook
+Route::get('/platforms/{platform}/check-token', function (App\Models\Platform $platform) {
+    if (!$platform->access_token) {
+        return response()->json([
+            'error' => 'Nenhum token encontrado',
+            'solution' => 'Conecte a plataforma primeiro',
+            'status' => 'no_token',
+            'platform_id' => $platform->id,
+            'platform_name' => $platform->name
+        ]);
+    }
+
+    // Testar o token com chamada básica
+    $response = Http::timeout(10)->get('https://graph.facebook.com/v21.0/me', [
+        'access_token' => $platform->access_token,
+        'fields' => 'id,name'
+    ]);
+
+    $tokenValid = $response->successful();
+    $responseData = $response->json();
+
+    // Se token válido, testar debug_token também
+    $debugData = null;
+    if ($tokenValid) {
+        $debugResponse = Http::timeout(10)->get('https://graph.facebook.com/v21.0/debug_token', [
+            'input_token' => $platform->access_token,
+            'access_token' => $platform->access_token
+        ]);
+        
+        if ($debugResponse->successful()) {
+            $debugData = $debugResponse->json();
+        }
+    }
+
+    return response()->json([
+        'platform_id' => $platform->id,
+        'platform_name' => $platform->name,
+        'token_preview' => substr($platform->access_token, 0, 20) . '...' . substr($platform->access_token, -10),
+        'token_length' => strlen($platform->access_token),
+        'token_valid' => $tokenValid,
+        'me_test' => [
+            'status' => $response->status(),
+            'success' => $response->successful(),
+            'data' => $responseData,
+            'error' => $response->failed() ? ($responseData['error'] ?? 'Erro desconhecido') : null
+        ],
+        'debug_token' => $debugData,
+        'last_connected' => $platform->updated_at?->diffForHumans(),
+        'created_at' => $platform->created_at?->format('d/m/Y H:i:s'),
+        'updated_at' => $platform->updated_at?->format('d/m/Y H:i:s'),
+        'recommendations' => $tokenValid ? [
+            'Token válido e funcionando',
+            'Você pode usar todas as funcionalidades do SDK'
+        ] : [
+            'Token inválido ou expirado',
+            'Clique em "Conectar" para renovar o token',
+            'Verifique se o app Facebook não foi desautorizado',
+            'Certifique-se de aceitar todas as permissões necessárias'
+        ]
+    ]);
+})->name('platforms.check-token');
 
 // Rotas para monitoramento de hashtags
 use App\Http\Controllers\HashtagController;

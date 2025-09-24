@@ -55,6 +55,9 @@
                                         <button class="btn btn-outline-info btn-sm" onclick="testFacebookAPI()">
                                             <i class="bi bi-facebook"></i> Testar Facebook API
                                         </button>
+                                        <button class="btn btn-outline-success btn-sm" onclick="checkToken()">
+                                            <i class="bi bi-shield-check"></i> Verificar Token
+                                        </button>
                                         <button class="btn btn-outline-warning btn-sm" onclick="debugFacebookComplete()">
                                             <i class="bi bi-bug"></i> Debug Completo
                                         </button>
@@ -1509,6 +1512,168 @@ function populateInstagramSelects(pages) {
         option.disabled = true;
         instagramSelect.appendChild(option);
     }
+}
+
+// Verificar status do token Facebook
+function checkToken() {
+    showAlert('Verificando status do token...', 'info');
+    
+    fetch(`/platforms/{{ $platform->id }}/check-token`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Token Status:', data);
+            
+            if (data.error) {
+                showTokenStatusModal({
+                    status: 'error',
+                    title: '❌ Token não encontrado',
+                    message: data.error,
+                    solution: data.solution,
+                    data: data
+                });
+            } else if (data.token_valid) {
+                showTokenStatusModal({
+                    status: 'success',
+                    title: '✅ Token válido',
+                    message: `Token funcionando para: ${data.me_test.data?.name || 'Usuário'}`,
+                    data: data
+                });
+                showAlert('Token válido e funcionando!', 'success');
+            } else {
+                showTokenStatusModal({
+                    status: 'error',
+                    title: '❌ Token inválido',
+                    message: 'Token expirado ou inválido',
+                    solution: 'Reconecte a plataforma para renovar o token',
+                    data: data
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao verificar token:', error);
+            showAlert('❌ Erro ao verificar token: ' + error.message, 'danger');
+        });
+}
+
+// Mostrar modal com status detalhado do token
+function showTokenStatusModal(tokenStatus) {
+    const modalId = 'tokenStatusModal';
+    let existingModal = document.getElementById(modalId);
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.id = modalId;
+    
+    const statusColor = tokenStatus.status === 'success' ? 'success' : 'danger';
+    const data = tokenStatus.data;
+    
+    modal.innerHTML = `
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-${statusColor} text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-shield-check"></i> ${tokenStatus.title}
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Informações do Token</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Plataforma:</strong></td>
+                                    <td>${data.platform_name}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Status:</strong></td>
+                                    <td>
+                                        ${data.token_valid ? 
+                                            '<span class="badge bg-success">Válido</span>' : 
+                                            '<span class="badge bg-danger">Inválido</span>'
+                                        }
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Preview:</strong></td>
+                                    <td><code>${data.token_preview || 'N/A'}</code></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Tamanho:</strong></td>
+                                    <td>${data.token_length || 0} caracteres</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Última conexão:</strong></td>
+                                    <td>${data.last_connected || 'N/A'}</td>
+                                </tr>
+                            </table>
+                            
+                            ${data.me_test && data.me_test.success ? `
+                                <h6 class="text-success">✅ Teste da API</h6>
+                                <p><strong>Usuário:</strong> ${data.me_test.data?.name || 'N/A'}</p>
+                                <p><strong>ID:</strong> ${data.me_test.data?.id || 'N/A'}</p>
+                            ` : data.me_test ? `
+                                <h6 class="text-danger">❌ Erro na API</h6>
+                                <p><strong>Status HTTP:</strong> ${data.me_test.status}</p>
+                                <p><strong>Erro:</strong> ${data.me_test.error?.message || 'Erro desconhecido'}</p>
+                            ` : ''}
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Recomendações</h6>
+                            ${data.recommendations ? `
+                                <ul class="list-group list-group-flush">
+                                    ${data.recommendations.map(rec => `<li class="list-group-item py-1">${rec}</li>`).join('')}
+                                </ul>
+                            ` : ''}
+                            
+                            ${data.debug_token ? `
+                                <h6 class="mt-3">Debug do Token</h6>
+                                <pre class="bg-light p-2 rounded small" style="max-height: 200px; overflow-y: auto;">${JSON.stringify(data.debug_token, null, 2)}</pre>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    ${!data.token_valid ? `
+                        <a href="/platforms/${data.platform_id}" class="btn btn-primary">
+                            <i class="bi bi-arrow-clockwise"></i> Reconectar Plataforma
+                        </a>
+                    ` : ''}
+                    <button type="button" class="btn btn-info" onclick="copyTokenDebug()">
+                        <i class="bi bi-clipboard"></i> Copiar Debug
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Salvar dados para cópia
+    window.lastTokenDebug = data;
+    
+    // Mostrar modal
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    
+    // Remover modal quando fechar
+    modal.addEventListener('hidden.bs.modal', function () {
+        modal.remove();
+    });
+}
+
+// Copiar debug do token
+function copyTokenDebug() {
+    if (window.lastTokenDebug) {
+        navigator.clipboard.writeText(JSON.stringify(window.lastTokenDebug, null, 2))
+            .then(() => showAlert('Debug do token copiado!', 'success'))
+            .catch(() => showAlert('Erro ao copiar debug', 'danger'));
+    }
+}
 }
 </script>
 @endsection

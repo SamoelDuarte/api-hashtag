@@ -120,7 +120,7 @@
                                         <h6>Interface Principal:</h6>
                                         <ul class="list-group list-group-flush">
                                             <li class="list-group-item">
-                                                <code>http://localhost/platforms/1/hashtags</code>
+                                                <code>http://localhost/api-hashtag/public/platforms/1/hashtags</code>
                                                 <br><small class="text-muted">Interface completa de hashtags</small>
                                             </li>
                                         </ul>
@@ -129,15 +129,15 @@
                                         <h6>APIs Diretas:</h6>
                                         <ul class="list-group list-group-flush">
                                             <li class="list-group-item">
-                                                <code>http://localhost/platforms/1/hashtags/accounts</code>
+                                                <code>http://localhost/api-hashtag/public/platforms/1/hashtags/accounts</code>
                                                 <br><small class="text-muted">Método básico</small>
                                             </li>
                                             <li class="list-group-item">
-                                                <code>http://localhost/platforms/1/hashtags/accounts-complete</code>
+                                                <code>http://localhost/api-hashtag/public/platforms/1/hashtags/accounts-complete</code>
                                                 <br><small class="text-muted">Método completo</small>
                                             </li>
                                             <li class="list-group-item">
-                                                <code>http://localhost/platforms/1/hashtags/accounts-sdk</code>
+                                                <code>http://localhost/api-hashtag/public/platforms/1/hashtags/accounts-sdk</code>
                                                 <br><small class="text-muted"><strong>SDK Oficial (Novo!)</strong></small>
                                             </li>
                                         </ul>
@@ -162,21 +162,21 @@
             resultsArea.style.display = 'none';
             loadingArea.style.display = 'block';
             
-            // Definir URL baseado no método
+            // Definir URL baseado no método - CORRIGIDO para usar public/
             let url;
             let methodName;
             
             switch(method) {
                 case 'basic':
-                    url = '/platforms/1/hashtags/accounts';
+                    url = '/api-hashtag/public/platforms/1/hashtags/accounts';
                     methodName = 'Método Básico';
                     break;
                 case 'complete':
-                    url = '/platforms/1/hashtags/accounts-complete';
+                    url = '/api-hashtag/public/platforms/1/hashtags/accounts-complete';
                     methodName = 'Método Completo';
                     break;
                 case 'sdk':
-                    url = '/platforms/1/hashtags/accounts-sdk';
+                    url = '/api-hashtag/public/platforms/1/hashtags/accounts-sdk';
                     methodName = 'SDK Oficial Facebook';
                     break;
             }

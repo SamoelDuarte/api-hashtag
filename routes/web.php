@@ -285,6 +285,59 @@ Route::get('/platforms/{platform}/check-token', function (App\Models\Platform $p
     ]);
 })->name('platforms.check-token');
 
+// Rota para definir token manualmente (para testes)
+Route::get('/platforms/{platform}/set-token/{token}', function (App\Models\Platform $platform, $token) {
+    try {
+        // Primeiro, testar se o token é válido
+        $response = Http::timeout(10)->get('https://graph.facebook.com/v21.0/me', [
+            'access_token' => $token,
+            'fields' => 'id,name'
+        ]);
+
+        if ($response->successful()) {
+            $userData = $response->json();
+            
+            // Atualizar plataforma com novo token
+            $platform->update([
+                'access_token' => $token,
+                'is_connected' => true,
+                'extra_data' => array_merge($platform->extra_data ?? [], [
+                    'user_data' => $userData,
+                    'token_updated_manually' => now()->toISOString(),
+                    'token_source' => 'manual_update'
+                ])
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Token atualizado com sucesso!',
+                'user_data' => $userData,
+                'platform_id' => $platform->id,
+                'platform_name' => $platform->name,
+                'next_steps' => [
+                    'Acesse a interface de hashtags',
+                    'Teste o botão "SDK Facebook (Melhorado)"',
+                    'Verifique se as páginas são carregadas'
+                ]
+            ]);
+        } else {
+            $error = $response->json();
+            return response()->json([
+                'success' => false,
+                'error' => 'Token inválido',
+                'details' => $error['error'] ?? 'Erro desconhecido',
+                'message' => 'O token fornecido não é válido'
+            ], 400);
+        }
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => 'Erro ao testar token',
+            'details' => $e->getMessage()
+        ], 500);
+    }
+})->name('platforms.set-token');
+
 // Rotas para monitoramento de hashtags
 use App\Http\Controllers\HashtagController;
 

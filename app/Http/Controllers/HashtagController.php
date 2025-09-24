@@ -693,10 +693,19 @@ class HashtagController extends Controller
         }
 
         try {
+            // Se app_id for de teste, usar configurações do .env
+            $appId = $platform->app_id;
+            $appSecret = $platform->app_secret;
+            
+            if ($appId === '123' || $appId === 'test' || empty($appId)) {
+                $appId = config('services.facebook.app_id', env('FACEBOOK_APP_ID'));
+                $appSecret = config('services.facebook.app_secret', env('FACEBOOK_APP_SECRET'));
+            }
+
             $facebook = new \App\Services\FacebookService(
                 $platform->access_token, 
-                $platform->app_id, 
-                $platform->app_secret
+                $appId, 
+                $appSecret
             );
 
             // Verificar se token é válido
@@ -704,7 +713,12 @@ class HashtagController extends Controller
                 return response()->json([
                     'success' => false,
                     'error' => 'Token inválido ou expirado',
-                    'message' => 'Por favor, reconecte a plataforma'
+                    'message' => 'Por favor, reconecte a plataforma',
+                    'debug' => [
+                        'using_app_id' => $appId,
+                        'platform_app_id' => $platform->app_id,
+                        'token_preview' => substr($platform->access_token, 0, 20) . '...'
+                    ]
                 ]);
             }
 

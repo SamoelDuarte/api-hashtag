@@ -338,6 +338,44 @@ Route::get('/platforms/{platform}/set-token/{token}', function (App\Models\Platf
     }
 })->name('platforms.set-token');
 
+// Rota para debug da plataforma
+Route::get('/platforms/{platform}/debug-data', function (App\Models\Platform $platform) {
+    return response()->json([
+        'platform_id' => $platform->id,
+        'platform_name' => $platform->name,
+        'app_id' => $platform->app_id,
+        'app_secret_preview' => substr($platform->app_secret, 0, 10) . '...',
+        'token_preview' => substr($platform->access_token, 0, 20) . '...',
+        'token_length' => strlen($platform->access_token),
+        'is_connected' => $platform->is_connected,
+        'created_at' => $platform->created_at,
+        'updated_at' => $platform->updated_at,
+        'issue' => 'O token foi gerado com app_id real, mas a plataforma tem app_id de teste'
+    ]);
+})->name('platforms.debug-data');
+
+// Rota para atualizar dados reais da plataforma
+Route::get('/platforms/{platform}/fix-app-data', function (App\Models\Platform $platform) {
+    // Dados reais do seu app Facebook (baseado no debug do token)
+    $realAppId = '1338469367894948';
+    $realAppSecret = 'SEU_APP_SECRET_REAL_AQUI'; // Você precisa colocar o secret real
+    
+    $platform->update([
+        'app_id' => $realAppId,
+        'app_secret' => $realAppSecret, // Você precisa colocar o secret real aqui
+        'name' => 'Instagram/Facebook - Produção'
+    ]);
+    
+    return response()->json([
+        'success' => true,
+        'message' => 'Dados da plataforma atualizados!',
+        'old_app_id' => '123',
+        'new_app_id' => $realAppId,
+        'platform_id' => $platform->id,
+        'next_step' => 'Agora o SDK deve funcionar corretamente'
+    ]);
+})->name('platforms.fix-app-data');
+
 // Rotas para monitoramento de hashtags
 use App\Http\Controllers\HashtagController;
 

@@ -101,6 +101,9 @@
                                         <button class="btn btn-success" onclick="loadAccountsSDK()">
                                             <i class="bi bi-gear-wide-connected"></i> SDK Facebook (Melhorado)
                                         </button>
+                                        <button class="btn btn-warning btn-sm" onclick="testSDKFunction()">
+                                            <i class="bi bi-wrench"></i> Teste SDK
+                                        </button>
                                         <button class="btn btn-secondary btn-sm" onclick="showAccountsHelp()">
                                             <i class="bi bi-question-circle"></i> Ajuda
                                         </button>
@@ -1674,6 +1677,35 @@ function copyTokenDebug() {
             .catch(() => showAlert('Erro ao copiar debug', 'danger'));
     }
 }
+
+// Função de teste para verificar se as funções estão definidas
+function testSDKFunction() {
+    console.log('🔍 Testando funções JavaScript...');
+    
+    const functions = {
+        'loadAccountsSDK': typeof loadAccountsSDK,
+        'loadAccounts': typeof loadAccounts,
+        'loadAccountsComplete': typeof loadAccountsComplete,
+        'displayAccountsError': typeof displayAccountsError,
+        'showFullDebugModal': typeof showFullDebugModal
+    };
+    
+    console.log('Funções disponíveis:', functions);
+    
+    let message = 'Status das funções:\n';
+    for (const [name, type] of Object.entries(functions)) {
+        message += `${name}: ${type}\n`;
+    }
+    
+    alert(message);
+    
+    if (typeof loadAccountsSDK === 'function') {
+        console.log('✅ loadAccountsSDK está definida, chamando...');
+        loadAccountsSDK();
+    } else {
+        console.error('❌ loadAccountsSDK não está definida!');
+        showAlert('Erro: loadAccountsSDK não está definida!', 'danger');
+    }
 }
 </script>
 @endsection

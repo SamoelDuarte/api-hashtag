@@ -708,8 +708,31 @@ class HashtagController extends Controller
                 $appSecret
             );
 
+            // Teste direto da API do Facebook primeiro
+            $directTest = Http::timeout(10)->get('https://graph.facebook.com/v21.0/me', [
+                'access_token' => $platform->access_token,
+                'fields' => 'id,name'
+            ]);
+
+            Log::info('SDK Direct API Test', [
+                'status' => $directTest->status(),
+                'success' => $directTest->successful(),
+                'response' => $directTest->json()
+            ]);
+
             // Verificar se token é válido
-            if (!$facebook->isTokenValid()) {
+            $tokenValid = $facebook->isTokenValid();
+            
+            // Se o SDK falhar mas a API direta funcionar, continuar
+            if (!$tokenValid && $directTest->successful()) {
+                Log::warning('SDK validation failed but direct API works - continuing anyway', [
+                    'platform_id' => $platform->id,
+                    'direct_test' => $directTest->json()
+                ]);
+                $tokenValid = true; // Forçar como válido pois a API direta funciona
+            }
+            
+            if (!$tokenValid) {
                 return response()->json([
                     'success' => false,
                     'error' => 'Token inválido ou expirado',
@@ -717,7 +740,14 @@ class HashtagController extends Controller
                     'debug' => [
                         'using_app_id' => $appId,
                         'platform_app_id' => $platform->app_id,
-                        'token_preview' => substr($platform->access_token, 0, 20) . '...'
+                        'token_preview' => substr($platform->access_token, 0, 20) . '...',
+                        'direct_api_test' => [
+                            'status' => $directTest->status(),
+                            'success' => $directTest->successful(),
+                            'response' => $directTest->json()
+                        ],
+                        'sdk_validation_failed' => true,
+                        'suggestion' => 'Verifique os logs para detalhes do erro do FacebookService'
                     ]
                 ]);
             }

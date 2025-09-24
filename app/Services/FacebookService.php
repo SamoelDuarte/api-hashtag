@@ -262,9 +262,18 @@ class FacebookService
     public function isTokenValid()
     {
         try {
-            $this->getMe('id');
+            $result = $this->getMe('id');
+            Log::info('FacebookService - isTokenValid SUCCESS', [
+                'result' => $result,
+                'token_preview' => substr($this->accessToken, 0, 20) . '...'
+            ]);
             return true;
         } catch (Exception $e) {
+            Log::error('FacebookService - isTokenValid ERROR', [
+                'error' => $e->getMessage(),
+                'token_preview' => substr($this->accessToken, 0, 20) . '...',
+                'exception_class' => get_class($e)
+            ]);
             return false;
         }
     }

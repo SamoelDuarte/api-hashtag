@@ -941,6 +941,178 @@ function showSDKDebug(data) {
     showFullDebugModal(data, 'Debug - Facebook SDK (Oficial)');
 }
 
+// Mostrar erros de contas (função que estava faltando)
+function displayAccountsError(data, methodType) {
+    const container = document.getElementById('accounts-container');
+    
+    let html = `
+        <div class="alert alert-danger">
+            <h6><i class="bi bi-exclamation-triangle"></i> Erro ao carregar contas - ${methodType}</h6>
+            <p><strong>Erro:</strong> ${data.error || 'Erro desconhecido'}</p>
+    `;
+    
+    // Mostrar mensagem adicional se existir
+    if (data.message) {
+        html += `<p><strong>Detalhes:</strong> ${data.message}</p>`;
+    }
+    
+    // Mostrar sugestões se existirem
+    if (data.suggestions && data.suggestions.length > 0) {
+        html += `
+            <hr>
+            <p><strong>Possíveis soluções:</strong></p>
+            <ul>
+        `;
+        data.suggestions.forEach(suggestion => {
+            html += `<li>${suggestion}</li>`;
+        });
+        html += `</ul>`;
+    }
+    
+    // Botão para debug se disponível
+    if (data.debug) {
+        html += `
+            <hr>
+            <button class="btn btn-outline-info btn-sm" onclick="showMethodDebug('${methodType}', ${JSON.stringify(data).replace(/"/g, '&quot;')})">
+                <i class="bi bi-bug"></i> Ver Debug
+            </button>
+        `;
+    }
+    
+    // Botões de ação baseados no tipo
+    html += `
+        <hr>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-primary" onclick="${methodType === 'SDK' ? 'loadAccountsSDK' : methodType === 'Complete' ? 'loadAccountsComplete' : 'loadAccounts'}()">
+                <i class="bi bi-arrow-clockwise"></i> Tentar Novamente
+            </button>
+    `;
+    
+    // Botões alternativos se o método atual falhou
+    if (methodType === 'SDK') {
+        html += `
+            <button class="btn btn-sm btn-outline-warning" onclick="loadAccountsComplete()">
+                <i class="bi bi-building"></i> Tentar Método Completo
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="loadAccounts()">
+                <i class="bi bi-person-fill"></i> Tentar Método Básico
+            </button>
+        `;
+    } else if (methodType === 'Complete') {
+        html += `
+            <button class="btn btn-sm btn-outline-success" onclick="loadAccountsSDK()">
+                <i class="bi bi-gear-wide-connected"></i> Tentar SDK
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="loadAccounts()">
+                <i class="bi bi-person-fill"></i> Tentar Método Básico
+            </button>
+        `;
+    } else {
+        html += `
+            <button class="btn btn-sm btn-outline-success" onclick="loadAccountsSDK()">
+                <i class="bi bi-gear-wide-connected"></i> Tentar SDK
+            </button>
+            <button class="btn btn-sm btn-outline-info" onclick="loadAccountsComplete()">
+                <i class="bi bi-building"></i> Tentar Método Completo
+            </button>
+        `;
+    }
+    
+    html += `
+        </div>
+    </div>`;
+    
+    container.innerHTML = html;
+}
+
+// Mostrar debug específico do método
+function showMethodDebug(methodType, data) {
+    showFullDebugModal(data, `Debug - ${methodType} Method`);
+}
+
+// Mostrar modal de debug completo (função que estava faltando)
+function showFullDebugModal(debugData, title) {
+    // Criar modal dinamicamente
+    const modalId = 'fullDebugModal';
+    let existingModal = document.getElementById(modalId);
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.id = modalId;
+    modal.innerHTML = `
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-bug"></i> ${title || 'Debug Completo'}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Informações Principais</h6>
+                            <div class="mb-3">
+                                <strong>Status:</strong> ${debugData.success ? '<span class="text-success">Sucesso</span>' : '<span class="text-danger">Erro</span>'}
+                            </div>
+                            ${debugData.message ? `<div class="mb-3"><strong>Mensagem:</strong> ${debugData.message}</div>` : ''}
+                            ${debugData.error ? `<div class="mb-3"><strong>Erro:</strong> <span class="text-danger">${debugData.error}</span></div>` : ''}
+                            
+                            ${debugData.debug ? `
+                                <h6 class="mt-3">Debug Info</h6>
+                                <pre class="bg-light p-2 rounded small" style="max-height: 300px; overflow-y: auto;">${JSON.stringify(debugData.debug, null, 2)}</pre>
+                            ` : ''}
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Dados Completos</h6>
+                            <pre class="bg-light p-2 rounded small" style="max-height: 400px; overflow-y: auto;">${JSON.stringify(debugData, null, 2)}</pre>
+                            
+                            ${debugData.suggestions && debugData.suggestions.length > 0 ? `
+                                <h6 class="mt-3">Sugestões</h6>
+                                <ul class="list-group list-group-flush">
+                                    ${debugData.suggestions.map(suggestion => `<li class="list-group-item py-1">${suggestion}</li>`).join('')}
+                                </ul>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="button" class="btn btn-primary" onclick="copyFullDebugInfo()">
+                        <i class="bi bi-clipboard"></i> Copiar Debug
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Salvar dados para cópia
+    window.lastFullDebugData = debugData;
+    
+    // Mostrar modal
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    
+    // Remover modal quando fechar para evitar duplicatas
+    modal.addEventListener('hidden.bs.modal', function () {
+        modal.remove();
+    });
+}
+
+// Copiar informações de debug completo
+function copyFullDebugInfo() {
+    if (window.lastFullDebugData) {
+        navigator.clipboard.writeText(JSON.stringify(window.lastFullDebugData, null, 2))
+            .then(() => showAlert('Informações de debug copiadas!', 'success'))
+            .catch(() => showAlert('Erro ao copiar informações', 'danger'));
+    }
+}
+
 // Habilitar controles após carregar contas
 function enableControls() {
     document.getElementById('instagram-account').disabled = false;
@@ -1275,6 +1447,7 @@ function showDebugInfo() {
 }
 
 // Função para mostrar alertas
+// Função para mostrar alertas
 function showAlert(message, type = 'info') {
     const alert = document.createElement('div');
     alert.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
@@ -1292,6 +1465,50 @@ function showAlert(message, type = 'info') {
             alert.remove();
         }
     }, 5000);
+}
+
+// Popular selects de páginas (função que estava faltando)
+function populatePageSelects(pages) {
+    // Esta função pode ser usada para popular selects de páginas Facebook se necessário
+    const pageSelects = document.querySelectorAll('.page-select');
+    
+    pageSelects.forEach(select => {
+        select.innerHTML = '<option value="">Selecione uma página</option>';
+        
+        pages.forEach(page => {
+            const option = document.createElement('option');
+            option.value = page.id;
+            option.textContent = page.name;
+            select.appendChild(option);
+        });
+    });
+}
+
+// Popular selects do Instagram (função que estava faltando)
+function populateInstagramSelects(pages) {
+    const instagramSelect = document.getElementById('instagram-account');
+    if (!instagramSelect) return;
+    
+    instagramSelect.innerHTML = '<option value="">Selecione uma conta do Instagram</option>';
+    
+    pages.forEach(page => {
+        if (page.instagram_business_account) {
+            const option = document.createElement('option');
+            option.value = page.instagram_business_account.id;
+            option.textContent = `${page.name} (Instagram)`;
+            option.setAttribute('data-page-id', page.id);
+            instagramSelect.appendChild(option);
+        }
+    });
+    
+    // Se não há contas Instagram, mostrar mensagem
+    if (instagramSelect.options.length === 1) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'Nenhuma conta Instagram Business encontrada';
+        option.disabled = true;
+        instagramSelect.appendChild(option);
+    }
 }
 </script>
 @endsection

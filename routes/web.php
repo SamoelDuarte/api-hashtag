@@ -74,6 +74,69 @@ Route::get('/platforms/{platform}/test-binding', function (App\Models\Platform $
 // Rotas do CRUD de plataformas
 Route::resource('platforms', PlatformController::class);
 
+// Rotas de teste para Facebook SDK
+Route::get('/test-facebook-config', function () {
+    try {
+        Log::info('Testando configuração do Facebook');
+        
+        // Verificar se as configurações estão presentes
+        $appId = config('services.facebook.app_id');
+        $appSecret = config('services.facebook.app_secret');
+        $envAppId = env('FACEBOOK_APP_ID');
+        $envAppSecret = env('FACEBOOK_APP_SECRET');
+        
+        return response()->json([
+            'success' => true,
+            'config_check' => [
+                'services.facebook.app_id' => $appId ? 'SET' : 'NOT_SET',
+                'services.facebook.app_secret' => $appSecret ? 'SET' : 'NOT_SET',
+                'env.FACEBOOK_APP_ID' => $envAppId ? 'SET' : 'NOT_SET',
+                'env.FACEBOOK_APP_SECRET' => $envAppSecret ? 'SET' : 'NOT_SET',
+            ],
+            'message' => 'Configuração testada com sucesso'
+        ]);
+    } catch (Exception $e) {
+        Log::error('Erro ao testar configuração do Facebook: ' . $e->getMessage());
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+            'debug' => [
+                'exception_class' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]
+        ]);
+    }
+});
+
+// Rota para testar inicialização do SDK
+Route::get('/test-facebook-sdk', function () {
+    try {
+        Log::info('Testando inicialização do Facebook SDK');
+        
+        // Tentar inicializar o SDK sem token (só para testar se as credenciais funcionam)
+        $fbService = new App\Services\FacebookService();
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Facebook SDK inicializado com sucesso',
+            'sdk_version' => 'v21.0'
+        ]);
+    } catch (Exception $e) {
+        Log::error('Erro ao testar Facebook SDK: ' . $e->getMessage());
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+            'debug' => [
+                'exception_class' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ],
+            'message' => 'Erro ao inicializar Facebook SDK'
+        ]);
+    }
+});
+
 // Rotas específicas para OAuth
 Route::get('platforms/{platform}/connect', [PlatformController::class, 'connect'])->name('platforms.connect');
 Route::get('platforms/{platform}/callback', [PlatformController::class, 'callback'])->name('platforms.callback');

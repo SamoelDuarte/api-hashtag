@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use Facebook\Facebook;
+use Facebook\Exceptions\FacebookResponseException;
+use Facebook\Exceptions\FacebookSDKException;
 use Illuminate\Support\Facades\Log;
 use Exception;
 
@@ -15,11 +17,39 @@ class FacebookService
     {
         $this->accessToken = $accessToken;
         
-        $this->fb = new Facebook([
-            'app_id' => $appId ?: config('services.facebook.app_id', env('FACEBOOK_APP_ID')),
-            'app_secret' => $appSecret ?: config('services.facebook.app_secret', env('FACEBOOK_APP_SECRET')),
-            'default_graph_version' => 'v21.0',
+        // Obter credenciais com fallback
+        $finalAppId = $appId ?: config('services.facebook.app_id', env('FACEBOOK_APP_ID'));
+        $finalAppSecret = $appSecret ?: config('services.facebook.app_secret', env('FACEBOOK_APP_SECRET'));
+        
+        // Validar se as credenciais estão presentes
+        if (!$finalAppId || !$finalAppSecret) {
+            Log::error('FacebookService - Credenciais não configuradas', [
+                'app_id_present' => !empty($finalAppId),
+                'app_secret_present' => !empty($finalAppSecret),
+                'config_app_id' => config('services.facebook.app_id'),
+                'env_app_id' => env('FACEBOOK_APP_ID')
+            ]);
+            throw new Exception('Facebook App ID e App Secret devem ser configurados no .env');
+        }
+        
+        Log::info('FacebookService - Inicializando SDK', [
+            'app_id' => substr($finalAppId, 0, 10) . '...',
+            'app_secret_present' => !empty($finalAppSecret)
         ]);
+        
+        try {
+            $this->fb = new Facebook([
+                'app_id' => $finalAppId,
+                'app_secret' => $finalAppSecret,
+                'default_graph_version' => 'v21.0',
+            ]);
+        } catch (Exception $e) {
+            Log::error('FacebookService - Erro ao inicializar SDK', [
+                'error' => $e->getMessage(),
+                'exception_class' => get_class($e)
+            ]);
+            throw new Exception('Erro ao inicializar Facebook SDK: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -262,17 +292,39 @@ class FacebookService
     public function isTokenValid()
     {
         try {
+            if (!$this->accessToken) {
+                Log::warning('FacebookService - isTokenValid: Token não fornecido');
+                return false;
+            }
+            
             $result = $this->getMe('id');
             Log::info('FacebookService - isTokenValid SUCCESS', [
                 'result' => $result,
                 'token_preview' => substr($this->accessToken, 0, 20) . '...'
             ]);
             return true;
+        } catch (FacebookResponseException $e) {
+            Log::error('FacebookService - isTokenValid ResponseException', [
+                'error' => $e->getMessage(),
+                'token_preview' => substr($this->accessToken, 0, 20) . '...',
+                'response_code' => method_exists($e, 'getHttpStatusCode') ? $e->getHttpStatusCode() : 'unknown',
+                'response_data' => method_exists($e, 'getResponseData') ? $e->getResponseData() : 'unavailable'
+            ]);
+            return false;
+        } catch (FacebookSDKException $e) {
+            Log::error('FacebookService - isTokenValid SDKException', [
+                'error' => $e->getMessage(),
+                'token_preview' => substr($this->accessToken, 0, 20) . '...',
+                'exception_class' => get_class($e)
+            ]);
+            return false;
         } catch (Exception $e) {
             Log::error('FacebookService - isTokenValid ERROR', [
                 'error' => $e->getMessage(),
                 'token_preview' => substr($this->accessToken, 0, 20) . '...',
-                'exception_class' => get_class($e)
+                'exception_class' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
             ]);
             return false;
         }

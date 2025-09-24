@@ -519,4 +519,278 @@ class HashtagController extends Controller
 
         return $recommendations;
     }
+
+    /**
+     * Buscar páginas tanto pessoais quanto do Business Manager
+     */
+    public function getAccountIdsComplete(Platform $platform)
+    {
+        if (!$platform->is_connected || !$platform->access_token) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Plataforma não conectada',
+                'debug' => [
+                    'is_connected' => $platform->is_connected,
+                    'has_token' => !empty($platform->access_token)
+                ]
+            ]);
+        }
+
+        try {
+            $allPages = [];
+            $debugInfo = [
+                'searches_performed' => [],
+                'errors' => []
+            ];
+
+            // 1. Buscar páginas pessoais (/me/accounts)
+            $personalPagesResponse = Http::get('https://graph.facebook.com/v21.0/me/accounts', [
+                'fields' => 'id,name,access_token,tasks',
+                'access_token' => $platform->access_token
+            ]);
+
+            $debugInfo['searches_performed']['personal_pages'] = [
+                'endpoint' => '/me/accounts',
+                'status' => $personalPagesResponse->status(),
+                'success' => $personalPagesResponse->successful(),
+                'response' => $personalPagesResponse->json()
+            ];
+
+            if ($personalPagesResponse->successful()) {
+                $personalPages = $personalPagesResponse->json()['data'] ?? [];
+                foreach ($personalPages as $page) {
+                    $page['source'] = 'personal';
+                    $allPages[] = $page;
+                }
+            }
+
+            // 2. Buscar Business Managers (/me/businesses)
+            $businessesResponse = Http::get('https://graph.facebook.com/v21.0/me/businesses', [
+                'fields' => 'id,name',
+                'access_token' => $platform->access_token
+            ]);
+
+            $debugInfo['searches_performed']['businesses'] = [
+                'endpoint' => '/me/businesses',
+                'status' => $businessesResponse->status(),
+                'success' => $businessesResponse->successful(),
+                'response' => $businessesResponse->json()
+            ];
+
+            if ($businessesResponse->successful()) {
+                $businesses = $businessesResponse->json()['data'] ?? [];
+                
+                // 3. Para cada Business Manager, buscar suas páginas
+                foreach ($businesses as $business) {
+                    $businessPagesResponse = Http::get("https://graph.facebook.com/v21.0/{$business['id']}/client_pages", [
+                        'fields' => 'id,name,access_token,tasks',
+                        'access_token' => $platform->access_token
+                    ]);
+
+                    $debugInfo['searches_performed']['business_pages'][$business['id']] = [
+                        'endpoint' => "/{$business['id']}/client_pages",
+                        'business_name' => $business['name'],
+                        'status' => $businessPagesResponse->status(),
+                        'success' => $businessPagesResponse->successful(),
+                        'response' => $businessPagesResponse->json()
+                    ];
+
+                    if ($businessPagesResponse->successful()) {
+                        $businessPages = $businessPagesResponse->json()['data'] ?? [];
+                        foreach ($businessPages as $page) {
+                            $page['source'] = 'business';
+                            $page['business_name'] = $business['name'];
+                            $page['business_id'] = $business['id'];
+                            $allPages[] = $page;
+                        }
+                    }
+                }
+            }
+
+            // 4. Remover páginas duplicadas (mesmo ID)
+            $uniquePages = [];
+            $pageIds = [];
+            foreach ($allPages as $page) {
+                if (!in_array($page['id'], $pageIds)) {
+                    $pageIds[] = $page['id'];
+                    $uniquePages[] = $page;
+                }
+            }
+
+            // 5. Para cada página única, verificar Instagram Business
+            foreach ($uniquePages as $index => $page) {
+                $instagramResponse = Http::get("https://graph.facebook.com/v21.0/{$page['id']}", [
+                    'fields' => 'instagram_business_account',
+                    'access_token' => $platform->access_token
+                ]);
+
+                if ($instagramResponse->successful()) {
+                    $instagram = $instagramResponse->json();
+                    if (isset($instagram['instagram_business_account'])) {
+                        $uniquePages[$index]['instagram_business_account'] = $instagram['instagram_business_account'];
+                    }
+                }
+            }
+
+            $accountData = [
+                'pages' => $uniquePages,
+                'total_found' => count($uniquePages),
+                'sources' => [
+                    'personal' => count(array_filter($uniquePages, fn($p) => ($p['source'] ?? '') === 'personal')),
+                    'business' => count(array_filter($uniquePages, fn($p) => ($p['source'] ?? '') === 'business'))
+                ]
+            ];
+
+            // Salvar dados extras na plataforma
+            try {
+                $platform->update([
+                    'extra_data' => array_merge($platform->extra_data ?? [], [
+                        'account_data_complete' => $accountData,
+                        'last_sync_complete' => now()->toISOString(),
+                        'last_debug_complete' => $debugInfo
+                    ])
+                ]);
+            } catch (\Exception $updateException) {
+                $debugInfo['errors']['update_failed'] = $updateException->getMessage();
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Encontradas {$accountData['total_found']} páginas ({$accountData['sources']['personal']} pessoais, {$accountData['sources']['business']} do Business Manager)",
+                'data' => $accountData,
+                'debug' => $debugInfo
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Erro interno capturado',
+                'debug' => [
+                    'exception_message' => $e->getMessage(),
+                    'exception_file' => $e->getFile(),
+                    'exception_line' => $e->getLine(),
+                    'exception_trace' => $e->getTraceAsString()
+                ],
+                'message' => 'Erro interno - veja debug para detalhes'
+            ]);
+        }
+    }
+
+    /**
+     * Versão melhorada usando Facebook SDK
+     */
+    public function getAccountIdsSDK(Platform $platform)
+    {
+        if (!$platform->is_connected || !$platform->access_token) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Plataforma não conectada',
+                'debug' => [
+                    'is_connected' => $platform->is_connected,
+                    'has_token' => !empty($platform->access_token)
+                ]
+            ]);
+        }
+
+        try {
+            $facebook = new \App\Services\FacebookService(
+                $platform->access_token, 
+                $platform->app_id, 
+                $platform->app_secret
+            );
+
+            // Verificar se token é válido
+            if (!$facebook->isTokenValid()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Token inválido ou expirado',
+                    'message' => 'Por favor, reconecte a plataforma'
+                ]);
+            }
+
+            // Obter informações completas
+            $result = $facebook->getAllPagesComplete();
+            
+            $accountData = [
+                'pages' => $result['pages'],
+                'total_found' => count($result['pages']),
+                'sources' => [
+                    'personal' => count(array_filter($result['pages'], fn($p) => ($p['source'] ?? '') === 'personal')),
+                    'business' => count(array_filter($result['pages'], fn($p) => ($p['source'] ?? '') === 'business'))
+                ],
+                'instagram_accounts' => count(array_filter($result['pages'], fn($p) => isset($p['instagram_business_account'])))
+            ];
+
+            // Obter permissões para debug
+            $permissions = $facebook->getPermissions();
+            $grantedPermissions = [];
+            if (isset($permissions['data'])) {
+                $grantedPermissions = array_filter(
+                    array_map(fn($p) => $p['status'] === 'granted' ? $p['permission'] : null, $permissions['data'])
+                );
+            }
+
+            $debugInfo = [
+                'sdk_version' => 'Facebook Graph SDK',
+                'granted_permissions' => $grantedPermissions,
+                'has_pages_show_list' => in_array('pages_show_list', $grantedPermissions),
+                'has_instagram_basic' => in_array('instagram_basic', $grantedPermissions),
+                'api_calls_made' => $result['debug'],
+                'token_preview' => substr($platform->access_token, 0, 20) . '...'
+            ];
+
+            // Salvar dados na plataforma
+            try {
+                $platform->update([
+                    'extra_data' => array_merge($platform->extra_data ?? [], [
+                        'account_data_sdk' => $accountData,
+                        'last_sync_sdk' => now()->toISOString(),
+                        'last_debug_sdk' => $debugInfo
+                    ])
+                ]);
+            } catch (\Exception $updateException) {
+                $debugInfo['update_error'] = $updateException->getMessage();
+            }
+
+            $message = "✅ SDK: {$accountData['total_found']} páginas encontradas";
+            if ($accountData['sources']['personal'] > 0) {
+                $message .= " ({$accountData['sources']['personal']} pessoais";
+            }
+            if ($accountData['sources']['business'] > 0) {
+                $message .= ", {$accountData['sources']['business']} business)";
+            } else {
+                $message .= ")";
+            }
+            
+            if ($accountData['instagram_accounts'] > 0) {
+                $message .= " - {$accountData['instagram_accounts']} com Instagram";
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'data' => $accountData,
+                'debug' => $debugInfo
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Erro no FacebookService', [
+                'platform_id' => $platform->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Erro ao usar Facebook SDK',
+                'debug' => [
+                    'exception_message' => $e->getMessage(),
+                    'exception_file' => $e->getFile(),
+                    'exception_line' => $e->getLine(),
+                    'suggestion' => 'Verifique se o Facebook SDK foi instalado corretamente'
+                ],
+                'message' => 'Erro interno - veja debug para detalhes'
+            ]);
+        }
+    }
 }

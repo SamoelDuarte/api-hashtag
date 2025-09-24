@@ -32,6 +32,11 @@ Route::get('/test-hashtags-route', function () {
     ]);
 });
 
+// Página de teste do SDK
+Route::get('/test-sdk', function () {
+    return view('test-sdk');
+});
+
 // Rota de teste direto para accounts (sem precisar de plataforma)
 Route::get('/test-accounts', function () {
     return response()->json([
@@ -229,6 +234,8 @@ Route::prefix('platforms/{platform}/hashtags')->name('hashtags.')->group(functio
     
     // APIs para obter dados
     Route::get('/accounts', [HashtagController::class, 'getAccountIds'])->name('accounts');
+    Route::get('/accounts-complete', [HashtagController::class, 'getAccountIdsComplete'])->name('accounts.complete');
+    Route::get('/accounts-sdk', [HashtagController::class, 'getAccountIdsSDK'])->name('accounts.sdk');
     Route::post('/search', [HashtagController::class, 'searchHashtags'])->name('search');
     Route::post('/mentions', [HashtagController::class, 'getMentions'])->name('mentions');
     Route::post('/facebook-mentions', [HashtagController::class, 'getFacebookMentions'])->name('facebook-mentions');

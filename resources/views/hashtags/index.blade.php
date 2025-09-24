@@ -87,10 +87,30 @@
                             <div id="accounts-container">
                                 <div class="text-center py-4">
                                     <i class="bi bi-info-circle text-muted fs-4"></i>
-                                    <p class="text-muted mt-2">Clique em "Carregar Contas" para sincronizar suas páginas e contas do Instagram</p>
-                                    <button class="btn btn-primary" onclick="loadAccounts()">
-                                        <i class="bi bi-download"></i> Carregar Contas
-                                    </button>
+                                    <p class="text-muted mt-2">Escolha o método de busca de contas:</p>
+                                    <div class="d-flex gap-2 justify-content-center flex-wrap">
+                                        <button class="btn btn-primary" onclick="loadAccounts()">
+                                            <i class="bi bi-download"></i> Carregar Contas (Pessoais)
+                                        </button>
+                                        <button class="btn btn-info" onclick="loadAccountsComplete()">
+                                            <i class="bi bi-building"></i> Buscar Páginas + Business
+                                        </button>
+                                        <button class="btn btn-success" onclick="loadAccountsSDK()">
+                                            <i class="bi bi-gear-wide-connected"></i> SDK Facebook (Melhorado)
+                                        </button>
+                                        <button class="btn btn-secondary btn-sm" onclick="showAccountsHelp()">
+                                            <i class="bi bi-question-circle"></i> Ajuda
+                                        </button>
+                                    </div>
+                                    <div id="accounts-help" class="mt-3" style="display: none;">
+                                        <div class="alert alert-info">
+                                            <strong>Diferença entre os métodos:</strong><br>
+                                            <strong>Carregar Contas (Pessoais):</strong> Busca apenas páginas conectadas diretamente ao seu usuário<br>
+                                            <strong>Buscar Páginas + Business:</strong> Busca páginas pessoais + páginas dentro do Business Manager<br>
+                                            <strong>SDK Facebook (Melhorado):</strong> Usa a biblioteca oficial do Facebook com melhor tratamento de erros<br>
+                                            <small class="text-muted">Recomendamos usar o <strong>SDK Facebook</strong> pois é mais confiável e robusto</small>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -646,6 +666,279 @@ function displayAccounts(accountData) {
             instagramSelect.appendChild(option);
         }
     });
+}
+
+// Carregar contas completas (pessoais + business)
+function loadAccountsComplete() {
+    const container = document.getElementById('accounts-container');
+    const loading = document.getElementById('loading-accounts');
+    
+    container.style.display = 'none';
+    loading.style.display = 'block';
+    
+    const platformId = {{ $platform->id }};
+    const url = `/platforms/${platformId}/hashtags/accounts-complete`;
+    
+    console.log('🏢 Buscando páginas completas (pessoais + business):', url);
+    
+    fetch(url)
+        .then(response => {
+            console.log('Response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Response data:', data);
+            loading.style.display = 'none';
+            
+            if (data.success) {
+                displayAccountsComplete(data);
+                enableControls();
+            } else {
+                displayAccountsError(data, 'Complete');
+            }
+            
+            container.style.display = 'block';
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            loading.style.display = 'none';
+            container.innerHTML = `
+                <div class="alert alert-danger">
+                    <h6><i class="bi bi-exclamation-triangle"></i> Erro de conexão</h6>
+                    <p>Não foi possível carregar as contas completas: ${error.message}</p>
+                    <button class="btn btn-sm btn-outline-primary" onclick="loadAccountsComplete()">Tentar Novamente</button>
+                </div>`;
+            container.style.display = 'block';
+        });
+}
+
+// Mostrar contas completas
+function displayAccountsComplete(data) {
+    const container = document.getElementById('accounts-container');
+    
+    let html = `
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6><i class="bi bi-check-circle-fill text-success"></i> ${data.message}</h6>
+            <button class="btn btn-sm btn-outline-info" onclick="showCompleteDebug(${JSON.stringify(data).replace(/"/g, '&quot;')})">
+                <i class="bi bi-code-slash"></i> Debug
+            </button>
+        </div>`;
+
+    if (data.data.pages && data.data.pages.length > 0) {
+        html += '<div class="row">';
+        
+        data.data.pages.forEach(page => {
+            const hasInstagram = page.instagram_business_account;
+            const sourceIcon = page.source === 'business' ? 'bi-building' : 'bi-person-fill';
+            const sourceText = page.source === 'business' ? 'Business Manager' : 'Página Pessoal';
+            
+            html += `
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100 ${hasInstagram ? 'border-success' : 'border-warning'}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="card-title mb-0">${page.name}</h6>
+                                <small class="text-muted">
+                                    <i class="bi ${sourceIcon}"></i> ${sourceText}
+                                </small>
+                            </div>
+                            <p class="text-muted small mb-2">ID: ${page.id}</p>
+                            ${page.business_name ? `<p class="text-info small mb-2"><i class="bi bi-building"></i> ${page.business_name}</p>` : ''}
+                            
+                            <div class="d-flex align-items-center">
+                                ${hasInstagram ? 
+                                    `<div class="text-success">
+                                        <i class="bi bi-instagram"></i> 
+                                        <small>Instagram Business: ${page.instagram_business_account.id}</small>
+                                    </div>` : 
+                                    `<div class="text-warning">
+                                        <i class="bi bi-exclamation-triangle"></i> 
+                                        <small>Sem Instagram Business</small>
+                                    </div>`
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        });
+        
+        html += '</div>';
+        
+        // Popular selects
+        populatePageSelects(data.data.pages);
+        populateInstagramSelects(data.data.pages);
+    } else {
+        html += `
+            <div class="alert alert-warning">
+                <h6><i class="bi bi-exclamation-triangle"></i> Nenhuma página encontrada</h6>
+                <p>Não foram encontradas páginas nem pessoais nem no Business Manager.</p>
+                <button class="btn btn-sm btn-outline-primary" onclick="showCompleteDebug(${JSON.stringify(data).replace(/"/g, '&quot;')})">
+                    Ver Debug Completo
+                </button>
+            </div>`;
+    }
+    
+    container.innerHTML = html;
+}
+
+// Mostrar debug das contas completas
+function showCompleteDebug(data) {
+    showFullDebugModal(data, 'Debug - Busca Completa (Pessoais + Business)');
+}
+
+// Mostrar/ocultar ajuda dos botões
+function showAccountsHelp() {
+    const helpDiv = document.getElementById('accounts-help');
+    const isVisible = helpDiv.style.display !== 'none';
+    helpDiv.style.display = isVisible ? 'none' : 'block';
+}
+
+// Carregar contas usando Facebook SDK
+function loadAccountsSDK() {
+    const container = document.getElementById('accounts-container');
+    const loading = document.getElementById('loading-accounts');
+    
+    container.style.display = 'none';
+    loading.style.display = 'block';
+    
+    const platformId = {{ $platform->id }};
+    const url = `/platforms/${platformId}/hashtags/accounts-sdk`;
+    
+    console.log('⚙️ Usando Facebook SDK:', url);
+    
+    fetch(url)
+        .then(response => {
+            console.log('SDK Response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('SDK Response data:', data);
+            loading.style.display = 'none';
+            
+            if (data.success) {
+                displayAccountsSDK(data);
+                enableControls();
+            } else {
+                displayAccountsError(data, 'SDK');
+            }
+            
+            container.style.display = 'block';
+        })
+        .catch(error => {
+            console.error('SDK Fetch error:', error);
+            loading.style.display = 'none';
+            container.innerHTML = `
+                <div class="alert alert-danger">
+                    <h6><i class="bi bi-exclamation-triangle"></i> Erro no Facebook SDK</h6>
+                    <p>Não foi possível carregar as contas via SDK: ${error.message}</p>
+                    <button class="btn btn-sm btn-outline-success" onclick="loadAccountsSDK()">Tentar Novamente</button>
+                </div>`;
+            container.style.display = 'block';
+        });
+}
+
+// Mostrar contas do SDK
+function displayAccountsSDK(data) {
+    const container = document.getElementById('accounts-container');
+    
+    let html = `
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6><i class="bi bi-check-circle-fill text-success"></i> ${data.message}</h6>
+            <div class="d-flex gap-2">
+                <span class="badge bg-success">SDK Oficial</span>
+                <button class="btn btn-sm btn-outline-info" onclick="showSDKDebug(${JSON.stringify(data).replace(/"/g, '&quot;')})">
+                    <i class="bi bi-code-slash"></i> Debug
+                </button>
+            </div>
+        </div>`;
+
+    if (data.data.pages && data.data.pages.length > 0) {
+        html += '<div class="row">';
+        
+        data.data.pages.forEach(page => {
+            const hasInstagram = page.instagram_business_account;
+            const sourceIcon = page.source === 'business' ? 'bi-building' : 'bi-person-fill';
+            const sourceText = page.source === 'business' ? 'Business Manager' : 'Página Pessoal';
+            const borderClass = hasInstagram ? 'border-success' : 'border-warning';
+            
+            html += `
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100 ${borderClass}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="card-title mb-0">${page.name}</h6>
+                                <div class="d-flex flex-column align-items-end">
+                                    <small class="text-muted mb-1">
+                                        <i class="bi ${sourceIcon}"></i> ${sourceText}
+                                    </small>
+                                    <span class="badge bg-info">SDK</span>
+                                </div>
+                            </div>
+                            <p class="text-muted small mb-2">ID: ${page.id}</p>
+                            ${page.business_name ? `<p class="text-info small mb-2"><i class="bi bi-building"></i> ${page.business_name}</p>` : ''}
+                            
+                            <div class="d-flex align-items-center">
+                                ${hasInstagram ? 
+                                    `<div class="text-success">
+                                        <i class="bi bi-instagram"></i> 
+                                        <small>Instagram Business: ${page.instagram_business_account.id}</small>
+                                    </div>` : 
+                                    `<div class="text-warning">
+                                        <i class="bi bi-exclamation-triangle"></i> 
+                                        <small>Sem Instagram Business</small>
+                                    </div>`
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        });
+        
+        html += '</div>';
+        
+        // Popular selects
+        populatePageSelects(data.data.pages);
+        populateInstagramSelects(data.data.pages);
+        
+        // Mostrar estatísticas
+        html += `
+            <div class="alert alert-info">
+                <div class="row text-center">
+                    <div class="col-3">
+                        <strong>${data.data.total_found}</strong><br>
+                        <small>Total de Páginas</small>
+                    </div>
+                    <div class="col-3">
+                        <strong>${data.data.sources.personal}</strong><br>
+                        <small>Pessoais</small>
+                    </div>
+                    <div class="col-3">
+                        <strong>${data.data.sources.business}</strong><br>
+                        <small>Business Manager</small>
+                    </div>
+                    <div class="col-3">
+                        <strong class="text-success">${data.data.instagram_accounts}</strong><br>
+                        <small>Com Instagram</small>
+                    </div>
+                </div>
+            </div>`;
+    } else {
+        html += `
+            <div class="alert alert-warning">
+                <h6><i class="bi bi-exclamation-triangle"></i> Nenhuma página encontrada pelo SDK</h6>
+                <p>O Facebook SDK não encontrou páginas. Verifique suas permissões.</p>
+                <button class="btn btn-sm btn-outline-primary" onclick="showSDKDebug(${JSON.stringify(data).replace(/"/g, '&quot;')})">
+                    Ver Debug do SDK
+                </button>
+            </div>`;
+    }
+    
+    container.innerHTML = html;
+}
+
+// Mostrar debug do SDK
+function showSDKDebug(data) {
+    showFullDebugModal(data, 'Debug - Facebook SDK (Oficial)');
 }
 
 // Habilitar controles após carregar contas

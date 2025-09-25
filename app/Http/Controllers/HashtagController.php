@@ -199,26 +199,67 @@ class HashtagController extends Controller
         $hashtag = $request->hashtag;
         $instagramBusinessId = $request->instagram_business_id;
 
+        Log::info('Iniciando busca de hashtags', [
+            'platform_id' => $platform->id,
+            'hashtag' => $hashtag,
+            'instagram_business_id' => $instagramBusinessId,
+            'has_access_token' => !empty($platform->access_token),
+            'token_preview' => $platform->access_token ? substr($platform->access_token, 0, 20) . '...' : null
+        ]);
+
         try {
             // 1. Buscar ID da hashtag
+            Log::info('Etapa 1: Buscando ID da hashtag');
             $hashtagSearchResponse = Http::get('https://graph.facebook.com/v21.0/ig_hashtag_search', [
                 'user_id' => $instagramBusinessId,
                 'q' => $hashtag,
                 'access_token' => $platform->access_token
             ]);
 
+            Log::info('Resposta da busca de hashtag', [
+                'status' => $hashtagSearchResponse->status(),
+                'successful' => $hashtagSearchResponse->successful(),
+                'response_body' => $hashtagSearchResponse->body()
+            ]);
+
             if (!$hashtagSearchResponse->successful()) {
-                return response()->json(['error' => 'Erro ao buscar hashtag'], 400);
+                $errorData = $hashtagSearchResponse->json();
+                Log::error('Erro na API do Facebook - busca hashtag', [
+                    'status' => $hashtagSearchResponse->status(),
+                    'error_data' => $errorData
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Erro ao buscar hashtag na API do Facebook',
+                    'debug' => [
+                        'status_code' => $hashtagSearchResponse->status(),
+                        'api_error' => $errorData['error'] ?? 'Erro desconhecido',
+                        'step' => 'hashtag_search'
+                    ]
+                ], 400);
             }
 
             $hashtagData = $hashtagSearchResponse->json();
+            Log::info('Dados da hashtag recebidos', ['hashtag_data' => $hashtagData]);
+            
             if (empty($hashtagData['data'])) {
-                return response()->json(['error' => 'Hashtag não encontrada'], 404);
+                return response()->json([
+                    'success' => false,
+                    'error' => "Hashtag '#{$hashtag}' não foi encontrada no Instagram",
+                    'debug' => [
+                        'hashtag' => $hashtag,
+                        'response' => $hashtagData,
+                        'step' => 'hashtag_not_found'
+                    ]
+                ], 404);
             }
 
             $hashtagId = $hashtagData['data'][0]['id'];
+            Log::info('ID da hashtag encontrado', ['hashtag_id' => $hashtagId]);
 
             // 2. Buscar posts recentes da hashtag
+            Log::info('Etapa 2: Buscando posts recentes da hashtag');
             $postsResponse = Http::get("https://graph.facebook.com/v21.0/{$hashtagId}/recent_media", [
                 'user_id' => $instagramBusinessId,
                 'fields' => 'id,caption,media_type,media_url,permalink,timestamp,username',
@@ -226,28 +267,71 @@ class HashtagController extends Controller
                 'access_token' => $platform->access_token
             ]);
 
+            Log::info('Resposta da busca de posts', [
+                'status' => $postsResponse->status(),
+                'successful' => $postsResponse->successful(),
+                'response_preview' => substr($postsResponse->body(), 0, 500)
+            ]);
+
             if (!$postsResponse->successful()) {
-                return response()->json(['error' => 'Erro ao buscar posts da hashtag'], 400);
+                $errorData = $postsResponse->json();
+                Log::error('Erro na API do Facebook - busca posts', [
+                    'status' => $postsResponse->status(),
+                    'error_data' => $errorData,
+                    'hashtag_id' => $hashtagId
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Erro ao buscar posts da hashtag na API do Facebook',
+                    'debug' => [
+                        'status_code' => $postsResponse->status(),
+                        'api_error' => $errorData['error'] ?? 'Erro desconhecido',
+                        'hashtag_id' => $hashtagId,
+                        'step' => 'posts_search'
+                    ]
+                ], 400);
             }
 
             $posts = $postsResponse->json();
+            $postsCount = count($posts['data'] ?? []);
+            
+            Log::info('Busca de hashtags concluída com sucesso', [
+                'hashtag' => $hashtag,
+                'hashtag_id' => $hashtagId,
+                'posts_found' => $postsCount
+            ]);
 
             return response()->json([
                 'success' => true,
                 'hashtag' => $hashtag,
                 'hashtag_id' => $hashtagId,
                 'posts' => $posts['data'] ?? [],
-                'total_posts' => count($posts['data'] ?? [])
+                'total_posts' => $postsCount,
+                'message' => "Encontrados {$postsCount} posts para a hashtag #{$hashtag}"
             ]);
 
-        } catch (\Exception $e) {
-            Log::error('Erro ao buscar hashtags', [
+        } catch (Exception $e) {
+            Log::error('Erro interno ao buscar hashtags', [
                 'platform_id' => $platform->id,
                 'hashtag' => $hashtag,
-                'error' => $e->getMessage()
+                'instagram_business_id' => $instagramBusinessId,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
             ]);
 
-            return response()->json(['error' => 'Erro interno: ' . $e->getMessage()], 500);
+            return response()->json([
+                'success' => false,
+                'error' => 'Erro interno do servidor',
+                'debug' => [
+                    'exception_message' => $e->getMessage(),
+                    'exception_file' => $e->getFile(),
+                    'exception_line' => $e->getLine(),
+                    'step' => 'internal_error'
+                ]
+            ], 500);
         }
     }
 

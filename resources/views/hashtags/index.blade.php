@@ -1326,8 +1326,17 @@ function enableControls() {
 document.getElementById('hashtag-form').addEventListener('submit', function(e) {
     e.preventDefault();
     
-    const instagramId = document.getElementById('instagram-account').value;
+    const instagramSelect = document.getElementById('instagram-account');
+    const instagramId = instagramSelect.value;
     const hashtag = document.getElementById('hashtag-input').value;
+    
+    // Debug: verificar o que está sendo selecionado
+    console.log('🔍 Valores do formulário:');
+    console.log('- Instagram ID selecionado:', instagramId);
+    console.log('- Hashtag:', hashtag);
+    console.log('- Opção selecionada:', instagramSelect.selectedOptions[0]?.textContent);
+    console.log('- Data da opção:', instagramSelect.selectedOptions[0]?.getAttribute('data-instagram-id'));
+    console.log('- Page ID:', instagramSelect.selectedOptions[0]?.getAttribute('data-page-id'));
     
     if (!instagramId || !hashtag) {
         showAlert('Selecione uma conta e digite uma hashtag', 'warning');
@@ -1338,12 +1347,15 @@ document.getElementById('hashtag-form').addEventListener('submit', function(e) {
 });
 
 function searchHashtag(instagramId, hashtag) {
+    console.log('🔍 Iniciando busca de hashtag:', { instagramId, hashtag }); // Debug
+    
     const resultsDiv = document.getElementById('hashtag-results');
     resultsDiv.style.display = 'block';
     resultsDiv.innerHTML = `
         <div class="text-center py-3">
             <div class="spinner-border text-primary" role="status"></div>
             <p class="mt-2 text-muted">Buscando posts com #${hashtag}...</p>
+            <small class="text-muted d-block">Instagram ID: ${instagramId}</small>
         </div>
     `;
     
@@ -1355,19 +1367,27 @@ function searchHashtag(instagramId, hashtag) {
         console.warn('CSRF token não encontrado');
     }
     
+    const requestData = {
+        hashtag: hashtag,
+        instagram_business_id: instagramId
+    };
+    
+    console.log('📤 Enviando requisição:', requestData); // Debug
+    
     fetch(`/platforms/{{ $platform->id }}/hashtags/search`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': token
         },
-        body: JSON.stringify({
-            hashtag: hashtag,
-            instagram_business_id: instagramId
-        })
+        body: JSON.stringify(requestData)
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('📥 Status da resposta:', response.status); // Debug
+        return response.json();
+    })
     .then(data => {
+        console.log('📥 Dados recebidos:', data); // Debug
         console.log('Resposta da busca de hashtags:', data);
         
         if (data.success) {
@@ -1935,17 +1955,23 @@ function testSDKFunction() {
 
 // Salvar conta no banco de dados
 function saveAccountToDatabase(account) {
+    // Garantir que temos o instagram_business_account correto
+    const instagramBusinessAccount = account.instagram_business_account || null;
+    
     const data = {
         account_id: account.id,
         name: account.name,
-        type: account.instagram_business_account ? 'page' : 'page',
+        type: instagramBusinessAccount ? 'page_with_instagram' : 'page',
         category: account.category || null,
         additional_info: {
-            instagram_business_account: account.instagram_business_account || null,
+            instagram_business_account: instagramBusinessAccount,
             business_name: account.business_name || null,
-            source: account.source || 'manual'
+            source: account.source || 'manual',
+            page_access_token: account.access_token || null
         }
     };
+
+    console.log('Salvando conta:', data); // Debug
 
     fetch(`/platforms/{{ $platform->id }}/hashtags/save-account`, {
         method: 'POST',
@@ -1957,6 +1983,7 @@ function saveAccountToDatabase(account) {
     })
     .then(response => response.json())
     .then(result => {
+        console.log('Resultado do salvamento:', result); // Debug
         if (result.success) {
             showAlert(`✅ Conta "${account.name}" salva no banco de dados!`, 'success');
             // Recarregar lista de contas salvas para atualizar o select
@@ -1964,6 +1991,8 @@ function saveAccountToDatabase(account) {
         } else {
             if (result.message.includes('já está salva')) {
                 showAlert(`ℹ️ Conta "${account.name}" ${result.message}`, 'info');
+                // Mesmo se já existe, recarregar para garantir que apareça no select
+                loadSavedAccountsToSelect();
             } else {
                 showAlert(`❌ Erro ao salvar conta: ${result.message}`, 'danger');
             }
@@ -2002,17 +2031,31 @@ function populateAccountSelect(accounts) {
     instagramSelect.innerHTML = '<option value="">Selecione uma conta salva</option>';
     
     accounts.forEach(account => {
-        const option = document.createElement('option');
-        option.value = account.account_id;
-        option.textContent = `${account.name}`;
-        option.setAttribute('data-account', JSON.stringify(account));
-        instagramSelect.appendChild(option);
+        // Verificar se tem Instagram Business Account nos dados salvos
+        const additionalInfo = typeof account.additional_info === 'string' ? 
+            JSON.parse(account.additional_info) : account.additional_info;
+        
+        const instagramBusinessAccount = additionalInfo?.instagram_business_account;
+        
+        if (instagramBusinessAccount && instagramBusinessAccount.id) {
+            const option = document.createElement('option');
+            // Usar o ID do Instagram Business Account como valor
+            option.value = instagramBusinessAccount.id;
+            option.textContent = `${account.name} (Instagram)`;
+            option.setAttribute('data-account', JSON.stringify(account));
+            option.setAttribute('data-page-id', account.account_id);
+            option.setAttribute('data-instagram-id', instagramBusinessAccount.id);
+            instagramSelect.appendChild(option);
+        } else {
+            // Se não tem Instagram Business Account, não adicionar à lista
+            console.warn(`Conta "${account.name}" não possui Instagram Business Account conectado`);
+        }
     });
     
-    if (accounts.length === 0) {
+    if (instagramSelect.options.length === 1) {
         const option = document.createElement('option');
         option.value = '';
-        option.textContent = 'Nenhuma conta salva encontrada';
+        option.textContent = 'Nenhuma conta com Instagram Business encontrada';
         option.disabled = true;
         instagramSelect.appendChild(option);
     }

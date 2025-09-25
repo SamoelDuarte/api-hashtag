@@ -1440,30 +1440,69 @@ function displayHashtagResults(data) {
     
     let html = `
         <div class="alert alert-success">
-            <i class="bi bi-check-circle"></i>
-            Encontrados ${data.total_posts} posts com #${data.hashtag}
+            <div class="d-flex align-items-center">
+                <i class="bi bi-instagram text-primary me-2 fs-5"></i>
+                <div>
+                    <strong>Instagram - Posts encontrados: ${data.total_posts}</strong><br>
+                    <small class="text-muted">Hashtag: #${data.hashtag} | Fonte: Instagram Business API</small>
+                </div>
+            </div>
         </div>
         <div class="row">
     `;
     
-    posts.slice(0, 6).forEach(post => {
+    posts.forEach(post => {
+        const postDate = new Date(post.timestamp).toLocaleString('pt-BR');
+        const mediaType = post.media_type || 'IMAGE';
+        const mediaTypeIcon = mediaType === 'VIDEO' ? 'bi-play-circle-fill' : 
+                             mediaType === 'CAROUSEL_ALBUM' ? 'bi-images' : 'bi-image-fill';
+        const mediaTypeText = mediaType === 'VIDEO' ? 'Vídeo' : 
+                             mediaType === 'CAROUSEL_ALBUM' ? 'Álbum' : 'Imagem';
+        
         html += `
-            <div class="col-md-6 mb-3">
-                <div class="card border-0 bg-light">
-                    <div class="card-body p-3">
-                        <div class="d-flex align-items-start">
-                            <div class="me-2">
-                                <i class="bi bi-instagram text-primary"></i>
-                            </div>
-                            <div class="flex-grow-1">
-                                <h6 class="mb-1">@${post.username}</h6>
-                                <p class="small text-muted mb-2">${post.caption ? post.caption.substring(0, 100) + '...' : 'Sem legenda'}</p>
-                                <small class="text-muted">${new Date(post.timestamp).toLocaleDateString('pt-BR')}</small>
+            <div class="col-lg-4 col-md-6 mb-4">
+                <div class="card h-100 shadow-sm border-0">
+                    ${post.media_url ? `
+                        <div class="position-relative">
+                            ${mediaType === 'VIDEO' ? `
+                                <video class="card-img-top" style="height: 200px; object-fit: cover;" controls>
+                                    <source src="${post.media_url}" type="video/mp4">
+                                    Seu navegador não suporta vídeo.
+                                </video>
+                            ` : `
+                                <img src="${post.media_url}" class="card-img-top" style="height: 200px; object-fit: cover;" alt="Post do Instagram">
+                            `}
+                            <div class="position-absolute top-0 end-0 m-2">
+                                <span class="badge bg-primary">
+                                    <i class="${mediaTypeIcon} me-1"></i>${mediaTypeText}
+                                </span>
                             </div>
                         </div>
-                        <div class="mt-2">
-                            <a href="${post.permalink}" target="_blank" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-box-arrow-up-right"></i> Ver Post
+                    ` : ''}
+                    
+                    <div class="card-body d-flex flex-column">
+                        <div class="mb-2">
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="bi bi-instagram text-primary me-2"></i>
+                                <small class="text-primary fw-bold">Instagram Post</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-auto">
+                            <p class="card-text small text-muted mb-2">
+                                <i class="bi bi-calendar3 me-1"></i>
+                                ${postDate}
+                            </p>
+                            <p class="card-text small">
+                                <i class="bi bi-hash me-1"></i>
+                                Post contém #${data.hashtag}
+                            </p>
+                        </div>
+                        
+                        <div class="mt-3 d-flex gap-2">
+                            <a href="${post.permalink}" target="_blank" class="btn btn-primary btn-sm flex-fill">
+                                <i class="bi bi-box-arrow-up-right me-1"></i>
+                                Ver no Instagram
                             </a>
                         </div>
                     </div>
@@ -1474,8 +1513,12 @@ function displayHashtagResults(data) {
     
     html += '</div>';
     
-    if (posts.length > 6) {
-        html += `<p class="text-muted text-center">Mostrando 6 de ${posts.length} posts encontrados.</p>`;
+    if (posts.length > 12) {
+        html += `
+            <div class="text-center mt-3">
+                <p class="text-muted">Mostrando os primeiros 12 posts de ${posts.length} encontrados</p>
+            </div>
+        `;
     }
     
     resultsDiv.innerHTML = html;
@@ -1558,12 +1601,15 @@ function loadMentions(type, accountId) {
 function displayMentionsResults(data, type) {
     const resultsDiv = document.getElementById('mentions-results');
     const mentions = type === 'instagram' ? data.mentions : data.tagged_posts;
+    const platformName = type === 'instagram' ? 'Instagram' : 'Facebook';
+    const platformIcon = type === 'instagram' ? 'bi-instagram' : 'bi-facebook';
+    const platformColor = type === 'instagram' ? 'text-primary' : 'text-primary';
     
     if (mentions.length === 0) {
         resultsDiv.innerHTML = `
             <div class="alert alert-info">
                 <i class="bi bi-info-circle"></i>
-                Nenhuma menção encontrada no ${type}
+                Nenhuma menção encontrada no ${platformName}
             </div>
         `;
         return;
@@ -1571,28 +1617,54 @@ function displayMentionsResults(data, type) {
     
     let html = `
         <div class="alert alert-success">
-            <i class="bi bi-check-circle"></i>
-            ${mentions.length} menções encontradas no ${type}
+            <div class="d-flex align-items-center">
+                <i class="bi ${platformIcon} ${platformColor} me-2 fs-5"></i>
+                <div>
+                    <strong>${platformName} - Menções encontradas: ${mentions.length}</strong><br>
+                    <small class="text-muted">Fonte: ${platformName} API | Posts que mencionam sua conta</small>
+                </div>
+            </div>
         </div>
-        <div class="list-group">
+        <div class="row">
     `;
     
-    mentions.slice(0, 5).forEach(mention => {
-        const icon = type === 'instagram' ? 'bi-instagram' : 'bi-facebook';
+    mentions.forEach(mention => {
         const username = mention.username || mention.from?.name || 'Usuário desconhecido';
         const content = mention.caption || mention.message || 'Sem conteúdo';
-        const date = mention.timestamp || mention.created_time;
+        const date = new Date(mention.timestamp || mention.created_time).toLocaleString('pt-BR');
+        const permalink = mention.permalink || mention.permalink_url || '#';
         
         html += `
-            <div class="list-group-item">
-                <div class="d-flex align-items-start">
-                    <div class="me-2">
-                        <i class="bi ${icon} text-primary"></i>
-                    </div>
-                    <div class="flex-grow-1">
-                        <h6 class="mb-1">${username}</h6>
-                        <p class="mb-1">${content.substring(0, 150)}${content.length > 150 ? '...' : ''}</p>
-                        <small class="text-muted">${new Date(date).toLocaleDateString('pt-BR')}</small>
+            <div class="col-lg-6 col-md-12 mb-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi ${platformIcon} ${platformColor} me-2 fs-5"></i>
+                            <div>
+                                <h6 class="mb-0">${username}</h6>
+                                <small class="text-muted">${platformName} Post</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <p class="card-text small text-dark">
+                                ${content.length > 200 ? content.substring(0, 200) + '...' : content}
+                            </p>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <p class="card-text small text-muted">
+                                <i class="bi bi-calendar3 me-1"></i>
+                                ${date}
+                            </p>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <a href="${permalink}" target="_blank" class="btn btn-primary btn-sm">
+                                <i class="bi bi-box-arrow-up-right me-1"></i>
+                                Ver no ${platformName}
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1601,9 +1673,16 @@ function displayMentionsResults(data, type) {
     
     html += '</div>';
     
-    if (mentions.length > 5) {
-        html += `<p class="text-muted text-center mt-2">Mostrando 5 de ${mentions.length} menções.</p>`;
+    if (mentions.length > 8) {
+        html += `
+            <div class="text-center mt-3">
+                <p class="text-muted">Mostrando as primeiras 8 menções de ${mentions.length} encontradas</p>
+            </div>
+        `;
     }
+    
+    resultsDiv.innerHTML = html;
+}
     
     resultsDiv.innerHTML = html;
 }

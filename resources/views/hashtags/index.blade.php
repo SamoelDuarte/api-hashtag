@@ -1356,11 +1356,19 @@ function searchHashtag(instagramId, hashtag) {
         </div>
     `;
     
+    // Obter CSRF token com proteção
+    const csrfToken = document.querySelector('meta[name="csrf-token"]');
+    const token = csrfToken ? csrfToken.getAttribute('content') : '';
+    
+    if (!token) {
+        console.warn('CSRF token não encontrado');
+    }
+    
     fetch(`/platforms/{{ $platform->id }}/hashtags/search`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            'X-CSRF-TOKEN': token
         },
         body: JSON.stringify({
             hashtag: hashtag,
@@ -1484,11 +1492,15 @@ function loadMentions(type, accountId) {
     const endpoint = type === 'instagram' ? 'mentions' : 'facebook-mentions';
     const param = type === 'instagram' ? 'instagram_business_id' : 'page_id';
     
+    // Obter CSRF token com proteção
+    const csrfToken = document.querySelector('meta[name="csrf-token"]');
+    const token = csrfToken ? csrfToken.getAttribute('content') : '';
+    
     fetch(`/platforms/{{ $platform->id }}/hashtags/${endpoint}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            'X-CSRF-TOKEN': token
         },
         body: JSON.stringify({
             [param]: accountId

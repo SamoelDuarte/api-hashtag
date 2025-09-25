@@ -200,35 +200,29 @@ class HashtagController extends Controller
         $hashtag = $request->hashtag;
         $instagramBusinessId = $request->instagram_business_id;
 
-        Log::info('Iniciando busca de hashtags', [
-            'platform_id' => $platform->id,
-            'hashtag' => $hashtag,
-            'instagram_business_id' => $instagramBusinessId,
-            'has_access_token' => !empty($platform->access_token),
-            'token_preview' => $platform->access_token ? substr($platform->access_token, 0, 20) . '...' : null
-        ]);
+        // Verificar se o instagram_business_id é numérico (IDs do Instagram são numéricos)
+        if (!is_numeric($instagramBusinessId)) {
+            return response()->json([
+                'success' => false,
+                'error' => 'ID do Instagram Business Account inválido',
+                'debug' => [
+                    'instagram_business_id' => $instagramBusinessId,
+                    'is_numeric' => is_numeric($instagramBusinessId),
+                    'step' => 'validation'
+                ]
+            ], 400);
+        }
 
         try {
             // 1. Buscar ID da hashtag
-            Log::info('Etapa 1: Buscando ID da hashtag');
             $hashtagSearchResponse = Http::get('https://graph.facebook.com/v21.0/ig_hashtag_search', [
                 'user_id' => $instagramBusinessId,
                 'q' => $hashtag,
                 'access_token' => $platform->access_token
             ]);
 
-            Log::info('Resposta da busca de hashtag', [
-                'status' => $hashtagSearchResponse->status(),
-                'successful' => $hashtagSearchResponse->successful(),
-                'response_body' => $hashtagSearchResponse->body()
-            ]);
-
             if (!$hashtagSearchResponse->successful()) {
                 $errorData = $hashtagSearchResponse->json();
-                Log::error('Erro na API do Facebook - busca hashtag', [
-                    'status' => $hashtagSearchResponse->status(),
-                    'error_data' => $errorData
-                ]);
                 
                 return response()->json([
                     'success' => false,
@@ -242,7 +236,6 @@ class HashtagController extends Controller
             }
 
             $hashtagData = $hashtagSearchResponse->json();
-            Log::info('Dados da hashtag recebidos', ['hashtag_data' => $hashtagData]);
             
             if (empty($hashtagData['data'])) {
                 return response()->json([
@@ -257,10 +250,8 @@ class HashtagController extends Controller
             }
 
             $hashtagId = $hashtagData['data'][0]['id'];
-            Log::info('ID da hashtag encontrado', ['hashtag_id' => $hashtagId]);
 
             // 2. Buscar posts recentes da hashtag
-            Log::info('Etapa 2: Buscando posts recentes da hashtag');
             $postsResponse = Http::get("https://graph.facebook.com/v21.0/{$hashtagId}/recent_media", [
                 'user_id' => $instagramBusinessId,
                 'fields' => 'id,media_type,media_url,permalink,timestamp',
@@ -268,19 +259,8 @@ class HashtagController extends Controller
                 'access_token' => $platform->access_token
             ]);
 
-            Log::info('Resposta da busca de posts', [
-                'status' => $postsResponse->status(),
-                'successful' => $postsResponse->successful(),
-                'response_preview' => substr($postsResponse->body(), 0, 500)
-            ]);
-
             if (!$postsResponse->successful()) {
                 $errorData = $postsResponse->json();
-                Log::error('Erro na API do Facebook - busca posts', [
-                    'status' => $postsResponse->status(),
-                    'error_data' => $errorData,
-                    'hashtag_id' => $hashtagId
-                ]);
                 
                 return response()->json([
                     'success' => false,
@@ -296,12 +276,6 @@ class HashtagController extends Controller
 
             $posts = $postsResponse->json();
             $postsCount = count($posts['data'] ?? []);
-            
-            Log::info('Busca de hashtags concluída com sucesso', [
-                'hashtag' => $hashtag,
-                'hashtag_id' => $hashtagId,
-                'posts_found' => $postsCount
-            ]);
 
             return response()->json([
                 'success' => true,
@@ -313,23 +287,11 @@ class HashtagController extends Controller
             ]);
 
         } catch (Exception $e) {
-            Log::error('Erro interno ao buscar hashtags', [
-                'platform_id' => $platform->id,
-                'hashtag' => $hashtag,
-                'instagram_business_id' => $instagramBusinessId,
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
             return response()->json([
                 'success' => false,
                 'error' => 'Erro interno do servidor',
                 'debug' => [
                     'exception_message' => $e->getMessage(),
-                    'exception_file' => $e->getFile(),
-                    'exception_line' => $e->getLine(),
                     'step' => 'internal_error'
                 ]
             ], 500);

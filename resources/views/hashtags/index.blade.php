@@ -90,24 +90,12 @@
                             <div id="accounts-container">
                                 <div class="text-center py-4">
                                     <i class="bi bi-info-circle text-muted fs-4"></i>
-                                    <p class="text-muted mt-2">Escolha o método de busca de contas:</p>
+                                    <p class="text-muted mt-2">Busque suas contas e páginas do Facebook/Instagram:</p>
                                     <div class="d-flex gap-2 justify-content-center flex-wrap">
-                                        <button class="btn btn-primary" onclick="loadAccounts()">
-                                            <i class="bi bi-download"></i> Carregar Contas (Pessoais)
-                                        </button>
                                         <button class="btn btn-info" onclick="loadAccountsComplete()">
                                             <i class="bi bi-building"></i> Buscar Páginas + Business
                                         </button>
-                                        <button class="btn btn-success" onclick="loadAccountsSDK()">
-                                            <i class="bi bi-gear-wide-connected"></i> SDK Facebook (Melhorado)
-                                        </button>
-                                        <button class="btn btn-outline-primary" onclick="showManualPageModal()">
-                                            <i class="bi bi-search"></i> Buscar por ID da Página
-                                        </button>
-                                        <button class="btn btn-warning btn-sm" onclick="testSDKFunction()">
-                                            <i class="bi bi-wrench"></i> Teste SDK
-                                        </button>
-                                        <button class="btn btn-secondary btn-sm" onclick="showAccountsHelp()">
+                                    </div>
                                             <i class="bi bi-question-circle"></i> Ajuda
                                         </button>
                                     </div>
@@ -957,6 +945,9 @@ function useManualPage() {
         return;
     }
     
+    // Salvar conta no banco de dados
+    saveAccountToDatabase(currentManualPage);
+    
     // Fechar modal
     const modal = bootstrap.Modal.getInstance(document.getElementById('manualPageModal'));
     modal.hide();
@@ -970,7 +961,7 @@ function useManualPage() {
             page_id: currentManualPage.id
         },
         total_pages: 1,
-        message: `Página ${currentManualPage.name} carregada manualmente`
+        message: `Página ${currentManualPage.name} carregada e salva no banco`
     };
     
     // Processar como se fosse uma resposta normal
@@ -1937,5 +1928,166 @@ function testSDKFunction() {
         showAlert('Erro: loadAccountsSDK não está definida!', 'danger');
     }
 }
+
+// =====================================================
+// FUNÇÕES PARA GERENCIAMENTO DE CONTAS SALVAS
+// =====================================================
+
+// Salvar conta no banco de dados
+function saveAccountToDatabase(account) {
+    const data = {
+        account_id: account.id,
+        name: account.name,
+        type: account.instagram_business_account ? 'page' : 'page',
+        category: account.category || null,
+        additional_info: {
+            instagram_business_account: account.instagram_business_account || null,
+            business_name: account.business_name || null,
+            source: account.source || 'manual'
+        }
+    };
+
+    fetch(`/platforms/{{ $platform->id }}/hashtags/save-account`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            showAlert(`✅ Conta "${account.name}" salva no banco de dados!`, 'success');
+            // Recarregar lista de contas salvas para atualizar o select
+            loadSavedAccountsToSelect();
+        } else {
+            if (result.message.includes('já está salva')) {
+                showAlert(`ℹ️ Conta "${account.name}" ${result.message}`, 'info');
+            } else {
+                showAlert(`❌ Erro ao salvar conta: ${result.message}`, 'danger');
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao salvar conta:', error);
+        showAlert('❌ Erro ao salvar conta no banco de dados', 'danger');
+    });
+}
+
+// Carregar contas salvas e popular o select
+function loadSavedAccountsToSelect() {
+    fetch(`/platforms/{{ $platform->id }}/hashtags/saved-accounts`)
+        .then(response => response.json())
+        .then(result => {
+            if (result.success && result.accounts.length > 0) {
+                populateAccountSelect(result.accounts);
+                showSavedAccountsInterface(result.accounts);
+            } else {
+                // Se não há contas salvas, mostrar interface padrão
+                showDefaultInterface();
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar contas salvas:', error);
+            showDefaultInterface();
+        });
+}
+
+// Popular select com contas salvas
+function populateAccountSelect(accounts) {
+    const instagramSelect = document.getElementById('instagram-account');
+    if (!instagramSelect) return;
+
+    instagramSelect.innerHTML = '<option value="">Selecione uma conta salva</option>';
+    
+    accounts.forEach(account => {
+        const option = document.createElement('option');
+        option.value = account.account_id;
+        option.textContent = `${account.name}`;
+        option.setAttribute('data-account', JSON.stringify(account));
+        instagramSelect.appendChild(option);
+    });
+    
+    if (accounts.length === 0) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'Nenhuma conta salva encontrada';
+        option.disabled = true;
+        instagramSelect.appendChild(option);
+    }
+}
+
+// Mostrar interface com contas salvas
+function showSavedAccountsInterface(accounts) {
+    const container = document.getElementById('accounts-container');
+    
+    let html = `
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6><i class="bi bi-database-check text-success"></i> Contas salvas carregadas (${accounts.length})</h6>
+            <button class="btn btn-sm btn-outline-primary" onclick="showDefaultInterface()">
+                <i class="bi bi-plus-circle"></i> Buscar novas contas
+            </button>
+        </div>
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            <strong>Suas contas estão salvas!</strong> Selecione uma conta no campo abaixo ou busque novas contas.
+        </div>`;
+
+    container.innerHTML = html;
+    enableControls();
+}
+
+// Mostrar interface padrão (buscar contas)
+function showDefaultInterface() {
+    const container = document.getElementById('accounts-container');
+    
+    container.innerHTML = `
+        <div class="text-center py-4">
+            <i class="bi bi-info-circle text-muted fs-4"></i>
+            <p class="text-muted mt-2">Busque suas contas e páginas do Facebook/Instagram:</p>
+            <div class="d-flex gap-2 justify-content-center flex-wrap">
+                <button class="btn btn-info" onclick="loadAccountsComplete()">
+                    <i class="bi bi-building"></i> Buscar Páginas + Business
+                </button>
+            </div>
+        </div>`;
+}
+
+// Remover conta salva
+function removeSavedAccount(accountId) {
+    if (!confirm('Tem certeza que deseja remover esta conta salva?')) {
+        return;
+    }
+
+    fetch(`/platforms/{{ $platform->id }}/hashtags/saved-account`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({ account_id: accountId })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('✅ Conta removida com sucesso!', 'success');
+            // Recarregar lista
+            loadSavedAccountsToSelect();
+        } else {
+            showAlert(`❌ Erro ao remover conta: ${result.message}`, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao remover conta:', error);
+        showAlert('❌ Erro ao remover conta', 'danger');
+    });
+}
+
+// Inicializar interface ao carregar página
+document.addEventListener('DOMContentLoaded', function() {
+    // Carregar contas salvas ao inicializar
+    loadSavedAccountsToSelect();
+});
 </script>
 @endsection

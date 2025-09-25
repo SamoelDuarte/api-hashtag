@@ -458,6 +458,11 @@ Route::prefix('platforms/{platform}/hashtags')->name('hashtags.')->group(functio
     Route::post('/mentions', [HashtagController::class, 'getMentions'])->name('mentions');
     Route::post('/facebook-mentions', [HashtagController::class, 'getFacebookMentions'])->name('facebook-mentions');
     
+    // Contas salvas
+    Route::post('/save-account', [HashtagController::class, 'saveAccount'])->name('save-account');
+    Route::get('/saved-accounts', [HashtagController::class, 'getSavedAccounts'])->name('saved-accounts');
+    Route::delete('/saved-account', [HashtagController::class, 'removeSavedAccount'])->name('remove-saved-account');
+    
     // Teste da API
     Route::get('/test-api', [HashtagController::class, 'testApi'])->name('test-api');
     

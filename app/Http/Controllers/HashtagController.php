@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Platform;
+use App\Models\SavedAccount;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -1039,6 +1040,110 @@ class HashtagController extends Controller
                     'page_id' => $pageId
                 ]
             ]);
+        }
+    }
+
+    /**
+     * Salvar conta no banco de dados
+     */
+    public function saveAccount(Request $request)
+    {
+        try {
+            $request->validate([
+                'account_id' => 'required|string',
+                'name' => 'required|string',
+                'type' => 'nullable|string',
+                'category' => 'nullable|string',
+            ]);
+
+            // Verificar se a conta já existe
+            $existingAccount = SavedAccount::where('account_id', $request->account_id)->first();
+
+            if ($existingAccount) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Esta conta já está salva!'
+                ]);
+            }
+
+            // Salvar nova conta
+            $savedAccount = SavedAccount::create([
+                'account_id' => $request->account_id,
+                'name' => $request->name,
+                'type' => $request->type ?? 'page',
+                'category' => $request->category,
+                'additional_info' => $request->additional_info ?? null,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Conta salva com sucesso!',
+                'account' => $savedAccount
+            ]);
+
+        } catch (Exception $e) {
+            Log::error('Erro ao salvar conta: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao salvar conta: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Listar contas salvas
+     */
+    public function getSavedAccounts()
+    {
+        try {
+            $accounts = SavedAccount::active()
+                ->orderBy('name')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'accounts' => $accounts
+            ]);
+
+        } catch (Exception $e) {
+            Log::error('Erro ao buscar contas salvas: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao buscar contas salvas: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Remover conta salva
+     */
+    public function removeSavedAccount(Request $request)
+    {
+        try {
+            $accountId = $request->input('account_id');
+            
+            $account = SavedAccount::where('account_id', $accountId)->first();
+            
+            if (!$account) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Conta não encontrada!'
+                ]);
+            }
+
+            $account->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Conta removida com sucesso!'
+            ]);
+
+        } catch (Exception $e) {
+            Log::error('Erro ao remover conta: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro ao remover conta: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

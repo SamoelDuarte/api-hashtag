@@ -976,6 +976,28 @@ function useManualPage() {
     // Processar como se fosse uma resposta normal
     displayAccounts(mockResult, 'manual');
     
+    // Popular os selects de Instagram
+    populateInstagramSelects([currentManualPage]);
+    
+    // Habilitar controles
+    enableControls();
+    
+    // Se a página tem Instagram, selecionar automaticamente
+    if (currentManualPage.instagram_business_account) {
+        setTimeout(() => {
+            const instagramSelect = document.getElementById('instagram-account');
+            if (instagramSelect) {
+                const option = instagramSelect.querySelector(`option[value="${currentManualPage.instagram_business_account.id}"]`);
+                if (option) {
+                    instagramSelect.value = currentManualPage.instagram_business_account.id;
+                    
+                    // Mostrar feedback visual
+                    showAlert(`Conta Instagram selecionada: @${currentManualPage.instagram_business_account.username}`, 'success');
+                }
+            }
+        }, 100);
+    }
+    
     // Limpar página atual
     currentManualPage = null;
 }

@@ -101,6 +101,9 @@
                                         <button class="btn btn-success" onclick="loadAccountsSDK()">
                                             <i class="bi bi-gear-wide-connected"></i> SDK Facebook (Melhorado)
                                         </button>
+                                        <button class="btn btn-outline-primary" onclick="showManualPageModal()">
+                                            <i class="bi bi-search"></i> Buscar por ID da Página
+                                        </button>
                                         <button class="btn btn-warning btn-sm" onclick="testSDKFunction()">
                                             <i class="bi bi-wrench"></i> Teste SDK
                                         </button>
@@ -112,9 +115,10 @@
                                         <div class="alert alert-info">
                                             <strong>Diferença entre os métodos:</strong><br>
                                             <strong>Carregar Contas (Pessoais):</strong> Busca apenas páginas conectadas diretamente ao seu usuário<br>
-                                            <strong>Buscar Páginas + Business:</strong> Busca páginas pessoais + páginas dentro do Business Manager<br>
+                                            <strong>Buscar Páginas + Business:</strong> Busca por ID específico - ideal para páginas em Business Manager<br>
                                             <strong>SDK Facebook (Melhorado):</strong> Usa a biblioteca oficial do Facebook com melhor tratamento de erros<br>
-                                            <small class="text-muted">Recomendamos usar o <strong>SDK Facebook</strong> pois é mais confiável e robusto</small>
+                                            <strong>Buscar por ID da Página:</strong> Busca manual por ID - para páginas conectadas com Instagram (portfólio)<br>
+                                            <small class="text-muted">Use <strong>Carregar Contas</strong> primeiro. Se sua página não aparecer, use <strong>Buscar por ID</strong> ou <strong>Business</strong> com o ID específico</small>
                                         </div>
                                     </div>
                                 </div>
@@ -187,6 +191,64 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Buscar Página por ID -->
+<div class="modal fade" id="manualPageModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-search"></i> Buscar Página por ID
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Quando usar este método:</strong><br>
+                    • Sua página está conectada com Instagram (portfólio)<br>
+                    • A página não aparece nos outros métodos de busca<br>
+                    • Você tem o ID específico da página do Facebook
+                </div>
+                
+                <form id="manual-page-form">
+                    <div class="mb-3">
+                        <label for="page-id-input" class="form-label">ID da Página do Facebook</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="page-id-input" 
+                               placeholder="Digite o ID da página (ex: 123456789012345)"
+                               required>
+                        <div class="form-text">
+                            <i class="bi bi-lightbulb"></i> 
+                            Para encontrar o ID: vá na sua página do Facebook, clique em "Sobre" e procure por "ID da Página"
+                        </div>
+                    </div>
+                </form>
+                
+                <div id="manual-search-loading" class="text-center" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Buscando...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Buscando informações da página...</p>
+                </div>
+                
+                <div id="manual-search-result" style="display: none;">
+                    <!-- Resultado da busca aparecerá aqui -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="searchPageById()">
+                    <i class="bi bi-search"></i> Buscar Página
+                </button>
+                <button type="button" class="btn btn-success" onclick="useManualPage()" id="use-manual-page-btn" style="display: none;">
+                    <i class="bi bi-check-circle"></i> Usar Esta Página
+                </button>
             </div>
         </div>
     </div>
@@ -674,48 +736,9 @@ function displayAccounts(accountData) {
     });
 }
 
-// Carregar contas completas (pessoais + business)
+// Carregar contas completas (pessoais + business) - agora via modal
 function loadAccountsComplete() {
-    const container = document.getElementById('accounts-container');
-    const loading = document.getElementById('loading-accounts');
-    
-    container.style.display = 'none';
-    loading.style.display = 'block';
-    
-    const platformId = {{ $platform->id }};
-    const url = `/platforms/${platformId}/hashtags/accounts-complete`;
-    
-    console.log('🏢 Buscando páginas completas (pessoais + business):', url);
-    
-    fetch(url)
-        .then(response => {
-            console.log('Response status:', response.status);
-            return response.json();
-        })
-        .then(data => {
-            console.log('Response data:', data);
-            loading.style.display = 'none';
-            
-            if (data.success) {
-                displayAccountsComplete(data);
-                enableControls();
-            } else {
-                displayAccountsError(data, 'Complete');
-            }
-            
-            container.style.display = 'block';
-        })
-        .catch(error => {
-            console.error('Fetch error:', error);
-            loading.style.display = 'none';
-            container.innerHTML = `
-                <div class="alert alert-danger">
-                    <h6><i class="bi bi-exclamation-triangle"></i> Erro de conexão</h6>
-                    <p>Não foi possível carregar as contas completas: ${error.message}</p>
-                    <button class="btn btn-sm btn-outline-primary" onclick="loadAccountsComplete()">Tentar Novamente</button>
-                </div>`;
-            container.style.display = 'block';
-        });
+    showManualPageModal('business');
 }
 
 // Mostrar contas completas
@@ -797,6 +820,164 @@ function showAccountsHelp() {
     const helpDiv = document.getElementById('accounts-help');
     const isVisible = helpDiv.style.display !== 'none';
     helpDiv.style.display = isVisible ? 'none' : 'block';
+}
+
+// Mostrar modal para busca manual por ID
+function showManualPageModal(type = 'manual') {
+    const modal = new bootstrap.Modal(document.getElementById('manualPageModal'));
+    
+    // Ajustar título e texto baseado no tipo
+    const modalTitle = document.querySelector('#manualPageModal .modal-title');
+    const alertText = document.querySelector('#manualPageModal .alert-info');
+    
+    if (type === 'business') {
+        modalTitle.innerHTML = '<i class="bi bi-building"></i> Buscar Página + Business';
+        alertText.innerHTML = `
+            <i class="bi bi-info-circle"></i>
+            <strong>Busca por ID - Páginas + Business:</strong><br>
+            • Para páginas que estão em Business Manager<br>
+            • Páginas conectadas com Instagram (portfólio)<br>
+            • Páginas que não aparecem na busca automática<br>
+            • Digite o ID específico da página do Facebook
+        `;
+    } else {
+        modalTitle.innerHTML = '<i class="bi bi-search"></i> Buscar Página por ID';
+        alertText.innerHTML = `
+            <i class="bi bi-info-circle"></i>
+            <strong>Quando usar este método:</strong><br>
+            • Sua página está conectada com Instagram (portfólio)<br>
+            • A página não aparece nos outros métodos de busca<br>
+            • Você tem o ID específico da página do Facebook
+        `;
+    }
+    
+    // Limpar campos anteriores
+    document.getElementById('page-id-input').value = '';
+    document.getElementById('manual-search-result').style.display = 'none';
+    document.getElementById('use-manual-page-btn').style.display = 'none';
+    
+    modal.show();
+}
+
+// Buscar página por ID
+let currentManualPage = null;
+function searchPageById() {
+    const pageId = document.getElementById('page-id-input').value.trim();
+    
+    if (!pageId) {
+        alert('Por favor, digite o ID da página');
+        return;
+    }
+    
+    // Mostrar loading
+    document.getElementById('manual-search-loading').style.display = 'block';
+    document.getElementById('manual-search-result').style.display = 'none';
+    document.getElementById('use-manual-page-btn').style.display = 'none';
+    
+    fetch(`/platforms/${platformData.id}/hashtags/page-by-id?page_id=${encodeURIComponent(pageId)}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('manual-search-loading').style.display = 'none';
+            
+            if (data.success) {
+                currentManualPage = data.page;
+                displayManualPageResult(data.page);
+                document.getElementById('use-manual-page-btn').style.display = 'inline-block';
+            } else {
+                displayManualPageError(data.error, data.debug);
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao buscar página:', error);
+            document.getElementById('manual-search-loading').style.display = 'none';
+            displayManualPageError('Erro de conexão: ' + error.message);
+        });
+}
+
+// Exibir resultado da busca manual
+function displayManualPageResult(page) {
+    const resultDiv = document.getElementById('manual-search-result');
+    
+    const instagramInfo = page.instagram_business_account ? 
+        `<div class="badge bg-success me-2">
+            <i class="bi bi-instagram"></i> Instagram: @${page.instagram_business_account.username}
+        </div>` : 
+        '<div class="badge bg-warning">Sem Instagram conectado</div>';
+    
+    const accessInfo = page.has_access ?
+        '<div class="badge bg-success">Você tem acesso</div>' :
+        '<div class="badge bg-danger">Acesso limitado</div>';
+    
+    const pictureHtml = page.picture ? 
+        `<img src="${page.picture}" alt="Foto da página" class="rounded me-2" style="width: 50px; height: 50px; object-fit: cover;">` :
+        '<i class="bi bi-image text-muted me-2" style="font-size: 50px;"></i>';
+    
+    resultDiv.innerHTML = `
+        <div class="alert alert-success">
+            <div class="d-flex align-items-start">
+                ${pictureHtml}
+                <div class="flex-grow-1">
+                    <h6 class="mb-1">
+                        <i class="bi bi-facebook text-primary"></i> ${page.name}
+                    </h6>
+                    <p class="mb-2 text-muted small">ID: ${page.id}</p>
+                    <div class="mb-2">
+                        ${instagramInfo}
+                        ${accessInfo}
+                    </div>
+                    ${page.category ? `<small class="text-muted">Categoria: ${page.category}</small>` : ''}
+                    ${page.fan_count ? `<br><small class="text-muted">Seguidores: ${page.fan_count.toLocaleString()}</small>` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    resultDiv.style.display = 'block';
+}
+
+// Exibir erro na busca manual
+function displayManualPageError(error, debug = null) {
+    const resultDiv = document.getElementById('manual-search-result');
+    
+    resultDiv.innerHTML = `
+        <div class="alert alert-danger">
+            <h6><i class="bi bi-exclamation-triangle"></i> Erro ao buscar página</h6>
+            <p class="mb-0">${error}</p>
+            ${debug ? `<small class="text-muted mt-2 d-block">Debug: ${JSON.stringify(debug, null, 2)}</small>` : ''}
+        </div>
+    `;
+    
+    resultDiv.style.display = 'block';
+}
+
+// Usar página encontrada manualmente
+function useManualPage() {
+    if (!currentManualPage) {
+        alert('Nenhuma página selecionada');
+        return;
+    }
+    
+    // Fechar modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('manualPageModal'));
+    modal.hide();
+    
+    // Simular o resultado como se viesse de uma busca normal
+    const mockResult = {
+        success: true,
+        pages: [currentManualPage],
+        debug: {
+            method: 'manual_search',
+            page_id: currentManualPage.id
+        },
+        total_pages: 1,
+        message: `Página ${currentManualPage.name} carregada manualmente`
+    };
+    
+    // Processar como se fosse uma resposta normal
+    displayAccounts(mockResult, 'manual');
+    
+    // Limpar página atual
+    currentManualPage = null;
 }
 
 // Carregar contas usando Facebook SDK

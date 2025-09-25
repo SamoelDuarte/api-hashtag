@@ -6,6 +6,7 @@ use App\Models\Platform;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Exception;
 
 class HashtagController extends Controller
 {
@@ -834,6 +835,125 @@ class HashtagController extends Controller
                     'suggestion' => 'Verifique se o Facebook SDK foi instalado corretamente'
                 ],
                 'message' => 'Erro interno - veja debug para detalhes'
+            ]);
+        }
+    }
+
+    /**
+     * Buscar página específica por ID
+     */
+    public function getPageById(Platform $platform, Request $request)
+    {
+        if (!$platform->is_connected || !$platform->access_token) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Plataforma não conectada',
+                'debug' => [
+                    'is_connected' => $platform->is_connected,
+                    'has_token' => !empty($platform->access_token)
+                ]
+            ], 400);
+        }
+
+        $pageId = $request->input('page_id');
+        if (!$pageId) {
+            return response()->json([
+                'success' => false,
+                'error' => 'ID da página é obrigatório'
+            ], 400);
+        }
+
+        try {
+            Log::info("Buscando página por ID: {$pageId}");
+
+            // Buscar informações básicas da página
+            $pageResponse = Http::get("https://graph.facebook.com/v21.0/{$pageId}", [
+                'fields' => 'id,name,category,about,phone,website,location,picture,fan_count,access_token',
+                'access_token' => $platform->access_token
+            ]);
+
+            if (!$pageResponse->successful()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Erro ao buscar página: ' . ($pageResponse->json()['error']['message'] ?? 'Erro desconhecido'),
+                    'debug' => [
+                        'status' => $pageResponse->status(),
+                        'response' => $pageResponse->json()
+                    ]
+                ]);
+            }
+
+            $pageData = $pageResponse->json();
+
+            // Tentar buscar Instagram Business Account conectado
+            $instagramResponse = Http::get("https://graph.facebook.com/v21.0/{$pageId}", [
+                'fields' => 'instagram_business_account{id,username,name,profile_picture_url,followers_count,media_count}',
+                'access_token' => $platform->access_token
+            ]);
+
+            $instagramData = null;
+            if ($instagramResponse->successful()) {
+                $instagramResponseData = $instagramResponse->json();
+                if (isset($instagramResponseData['instagram_business_account'])) {
+                    $instagramData = $instagramResponseData['instagram_business_account'];
+                }
+            }
+
+            // Verificar se o usuário tem acesso de administrador à página
+            $hasAccess = false;
+            $pageAccessToken = $pageData['access_token'] ?? null;
+            
+            if ($pageAccessToken) {
+                $hasAccess = true;
+            } else {
+                // Se não tem access_token, verificar se está na lista de páginas do usuário
+                $userPagesResponse = Http::get('https://graph.facebook.com/v21.0/me/accounts', [
+                    'access_token' => $platform->access_token
+                ]);
+                
+                if ($userPagesResponse->successful()) {
+                    $userPages = $userPagesResponse->json()['data'] ?? [];
+                    foreach ($userPages as $userPage) {
+                        if ($userPage['id'] === $pageId) {
+                            $hasAccess = true;
+                            $pageAccessToken = $userPage['access_token'] ?? null;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'page' => [
+                    'id' => $pageData['id'],
+                    'name' => $pageData['name'],
+                    'category' => $pageData['category'] ?? null,
+                    'about' => $pageData['about'] ?? null,
+                    'phone' => $pageData['phone'] ?? null,
+                    'website' => $pageData['website'] ?? null,
+                    'picture' => $pageData['picture']['data']['url'] ?? null,
+                    'fan_count' => $pageData['fan_count'] ?? null,
+                    'access_token' => $pageAccessToken,
+                    'has_access' => $hasAccess,
+                    'instagram_business_account' => $instagramData,
+                    'source' => 'manual_search'
+                ],
+                'message' => 'Página encontrada com sucesso'
+            ]);
+
+        } catch (Exception $e) {
+            Log::error("Erro ao buscar página por ID ({$pageId}): " . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'error' => 'Erro interno ao buscar página',
+                'debug' => [
+                    'exception_message' => $e->getMessage(),
+                    'exception_file' => $e->getFile(),
+                    'exception_line' => $e->getLine(),
+                    'page_id' => $pageId
+                ]
             ]);
         }
     }

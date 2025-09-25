@@ -453,6 +453,7 @@ Route::prefix('platforms/{platform}/hashtags')->name('hashtags.')->group(functio
     Route::get('/accounts', [HashtagController::class, 'getAccountIds'])->name('accounts');
     Route::get('/accounts-complete', [HashtagController::class, 'getAccountIdsComplete'])->name('accounts.complete');
     Route::get('/accounts-sdk', [HashtagController::class, 'getAccountIdsSDK'])->name('accounts.sdk');
+    Route::get('/page-by-id', [HashtagController::class, 'getPageById'])->name('page.by-id');
     Route::post('/search', [HashtagController::class, 'searchHashtags'])->name('search');
     Route::post('/mentions', [HashtagController::class, 'getMentions'])->name('mentions');
     Route::post('/facebook-mentions', [HashtagController::class, 'getFacebookMentions'])->name('facebook-mentions');

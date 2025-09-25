@@ -1382,39 +1382,10 @@ function searchHashtag(instagramId, hashtag) {
         if (data.success) {
             displayHashtagResults(data);
         } else {
-            let errorHtml = `
+            resultsDiv.innerHTML = `
                 <div class="alert alert-danger">
                     <h6><i class="bi bi-exclamation-triangle"></i> Erro na Busca de Hashtags</h6>
-                    <p class="mb-2"><strong>Erro:</strong> ${data.error}</p>
-            `;
-            
-            // Mostrar detalhes debug se disponível
-            if (data.debug) {
-                errorHtml += `
-                    <div class="mt-2">
-                        <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#error-debug" aria-expanded="false">
-                            <i class="bi bi-bug"></i> Ver Detalhes Técnicos
-                        </button>
-                        <div class="collapse mt-2" id="error-debug">
-                            <div class="card card-body bg-light">
-                                <small>
-                `;
-                
-                if (data.debug.api_error) {
-                    errorHtml += `<strong>API Error:</strong> ${JSON.stringify(data.debug.api_error, null, 2)}<br>`;
-                }
-                if (data.debug.status_code) {
-                    errorHtml += `<strong>Status Code:</strong> ${data.debug.status_code}<br>`;
-                }
-                if (data.debug.step) {
-                    errorHtml += `<strong>Etapa:</strong> ${data.debug.step}<br>`;
-                }
-                
-                errorHtml += `<strong>Debug Completo:</strong><br><pre>${JSON.stringify(data.debug, null, 2)}</pre>`;
-                errorHtml += `</small></div></div>`;
-            }
-            
-            errorHtml += `
+                    <p class="mb-2">${data.error}</p>
                     <div class="mt-2">
                         <button class="btn btn-sm btn-primary" onclick="searchHashtag('${instagramId}', '${hashtag}')">
                             <i class="bi bi-arrow-clockwise"></i> Tentar Novamente
@@ -1422,8 +1393,6 @@ function searchHashtag(instagramId, hashtag) {
                     </div>
                 </div>
             `;
-            
-            resultsDiv.innerHTML = errorHtml;
         }
     })
     .catch(error => {

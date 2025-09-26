@@ -119,7 +119,7 @@
             <!-- Seção de Monitoramento -->
             <div class="row">
                 <!-- Busca de Hashtags -->
-                <div class="col-md-6 mb-4">
+                <div class="col-md-12 mb-4">
                     <div class="card h-100">
                         <div class="card-header">
                             <h5 class="mb-0">
@@ -154,31 +154,7 @@
                     </div>
                 </div>
 
-                <!-- Busca de Menções -->
-                <div class="col-md-6 mb-4">
-                    <div class="card h-100">
-                        <div class="card-header">
-                            <h5 class="mb-0">
-                                <i class="bi bi-at"></i>
-                                Monitorar Menções
-                            </h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="d-grid gap-2">
-                                <button class="btn btn-outline-primary" onclick="loadInstagramMentions()" disabled id="instagram-mentions-btn">
-                                    <i class="bi bi-instagram"></i> Menções no Instagram
-                                </button>
-                                <button class="btn btn-outline-primary" onclick="loadFacebookMentions()" disabled id="facebook-mentions-btn">
-                                    <i class="bi bi-facebook"></i> Menções no Facebook
-                                </button>
-                            </div>
-
-                            <div id="mentions-results" class="mt-4" style="display: none;">
-                                <!-- Resultados aparecerão aqui -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
+              
             </div>
         </div>
     </div>

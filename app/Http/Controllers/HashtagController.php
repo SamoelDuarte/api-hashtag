@@ -299,6 +299,110 @@ class HashtagController extends Controller
     }
 
     /**
+     * Buscar hashtags em ambas as plataformas (Instagram e Facebook)
+     */
+    public function searchHashtagsComplete(Request $request, Platform $platform)
+    {
+        $request->validate([
+            'hashtag' => 'required|string|max:100',
+            'instagram_business_id' => 'required|string',
+            'page_id' => 'required|string'
+        ]);
+
+        $hashtag = $request->hashtag;
+        $instagramBusinessId = $request->instagram_business_id;
+        $pageId = $request->page_id;
+
+        // Verificar se o instagram_business_id é numérico
+        if (!is_numeric($instagramBusinessId)) {
+            return response()->json([
+                'success' => false,
+                'error' => 'ID do Instagram Business Account inválido'
+            ], 400);
+        }
+
+        $results = [
+            'success' => true,
+            'hashtag' => $hashtag,
+            'instagram_posts' => [],
+            'facebook_posts' => [],
+            'total_instagram' => 0,
+            'total_facebook' => 0,
+            'total_posts' => 0
+        ];
+
+        try {
+            // 1. Buscar posts do Instagram (método existente)
+            $hashtagSearchResponse = Http::get('https://graph.facebook.com/v21.0/ig_hashtag_search', [
+                'user_id' => $instagramBusinessId,
+                'q' => $hashtag,
+                'access_token' => $platform->access_token
+            ]);
+
+            if ($hashtagSearchResponse->successful()) {
+                $hashtagData = $hashtagSearchResponse->json();
+                
+                if (!empty($hashtagData['data'])) {
+                    $hashtagId = $hashtagData['data'][0]['id'];
+                    
+                    $postsResponse = Http::get("https://graph.facebook.com/v21.0/{$hashtagId}/recent_media", [
+                        'user_id' => $instagramBusinessId,
+                        'fields' => 'id,media_type,media_url,permalink,timestamp,caption',
+                        'limit' => 25,
+                        'access_token' => $platform->access_token
+                    ]);
+
+                    if ($postsResponse->successful()) {
+                        $instagramPosts = $postsResponse->json()['data'] ?? [];
+                        $results['instagram_posts'] = array_map(function($post) {
+                            $post['platform'] = 'instagram';
+                            return $post;
+                        }, $instagramPosts);
+                        $results['total_instagram'] = count($instagramPosts);
+                    }
+                }
+            }
+
+            // 2. Buscar posts do Facebook da página
+            $facebookPostsResponse = Http::get("https://graph.facebook.com/v21.0/{$pageId}/posts", [
+                'fields' => 'id,message,created_time,permalink_url,full_picture,type',
+                'limit' => 50,
+                'access_token' => $platform->access_token
+            ]);
+
+            if ($facebookPostsResponse->successful()) {
+                $allFacebookPosts = $facebookPostsResponse->json()['data'] ?? [];
+                
+                // Filtrar posts que contêm a hashtag
+                $facebookPostsWithHashtag = array_filter($allFacebookPosts, function($post) use ($hashtag) {
+                    $message = $post['message'] ?? '';
+                    return stripos($message, '#' . $hashtag) !== false;
+                });
+
+                $results['facebook_posts'] = array_map(function($post) {
+                    $post['platform'] = 'facebook';
+                    return $post;
+                }, array_values($facebookPostsWithHashtag));
+                $results['total_facebook'] = count($facebookPostsWithHashtag);
+            }
+
+            $results['total_posts'] = $results['total_instagram'] + $results['total_facebook'];
+            $results['message'] = "Instagram: {$results['total_instagram']} posts, Facebook: {$results['total_facebook']} posts";
+
+            return response()->json($results);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Erro interno do servidor',
+                'debug' => [
+                    'exception_message' => $e->getMessage()
+                ]
+            ], 500);
+        }
+    }
+
+    /**
      * Buscar menções no Instagram
      */
     public function getMentions(Request $request, Platform $platform)

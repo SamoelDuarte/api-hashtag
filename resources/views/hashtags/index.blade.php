@@ -1323,34 +1323,45 @@ document.getElementById('hashtag-form').addEventListener('submit', function(e) {
 });
 
 function searchHashtag(instagramId, hashtag) {
-    console.log('🔍 Iniciando busca de hashtag:', { instagramId, hashtag }); // Debug
+    console.log('🔍 Iniciando busca completa de hashtag:', { instagramId, hashtag });
     
     const resultsDiv = document.getElementById('hashtag-results');
     resultsDiv.style.display = 'block';
     resultsDiv.innerHTML = `
         <div class="text-center py-3">
             <div class="spinner-border text-primary" role="status"></div>
-            <p class="mt-2 text-muted">Buscando posts com #${hashtag}...</p>
-            <small class="text-muted d-block">Instagram ID: ${instagramId}</small>
+            <p class="mt-2 text-muted">Buscando posts no Instagram e Facebook com #${hashtag}...</p>
+            <small class="text-muted d-block">Aguarde, buscando em ambas as plataformas...</small>
         </div>
     `;
     
-    // Obter CSRF token com proteção
+    // Obter Page ID da opção selecionada
+    const instagramSelect = document.getElementById('instagram-account');
+    const selectedOption = instagramSelect.selectedOptions[0];
+    const pageId = selectedOption?.getAttribute('data-page-id');
+    
+    if (!pageId) {
+        resultsDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <h6><i class="bi bi-exclamation-triangle"></i> Erro</h6>
+                <p>Não foi possível obter o ID da página. Recarregue as contas e tente novamente.</p>
+            </div>
+        `;
+        return;
+    }
+    
     const csrfToken = document.querySelector('meta[name="csrf-token"]');
     const token = csrfToken ? csrfToken.getAttribute('content') : '';
     
-    if (!token) {
-        console.warn('CSRF token não encontrado');
-    }
-    
     const requestData = {
         hashtag: hashtag,
-        instagram_business_id: instagramId
+        instagram_business_id: instagramId,
+        page_id: pageId
     };
     
-    console.log('📤 Enviando requisição:', requestData); // Debug
+    console.log('📤 Enviando requisição completa:', requestData);
     
-    fetch(`/platforms/{{ $platform->id }}/hashtags/search`, {
+    fetch(`/platforms/{{ $platform->id }}/hashtags/search-complete`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1359,15 +1370,14 @@ function searchHashtag(instagramId, hashtag) {
         body: JSON.stringify(requestData)
     })
     .then(response => {
-        console.log('📥 Status da resposta:', response.status); // Debug
+        console.log('📥 Status da resposta:', response.status);
         return response.json();
     })
     .then(data => {
-        console.log('📥 Dados recebidos:', data); // Debug
-        console.log('Resposta da busca de hashtags:', data);
+        console.log('📥 Dados recebidos:', data);
         
         if (data.success) {
-            displayHashtagResults(data);
+            displayHashtagResultsComplete(data);
         } else {
             resultsDiv.innerHTML = `
                 <div class="alert alert-danger">
@@ -1398,6 +1408,188 @@ function searchHashtag(instagramId, hashtag) {
             </div>
         `;
     });
+}
+
+function displayHashtagResultsComplete(data) {
+    const resultsDiv = document.getElementById('hashtag-results');
+    const instagramPosts = data.instagram_posts || [];
+    const facebookPosts = data.facebook_posts || [];
+    const totalPosts = data.total_posts || 0;
+    
+    if (totalPosts === 0) {
+        resultsDiv.innerHTML = `
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i>
+                Nenhum post encontrado para #${data.hashtag} no Instagram nem no Facebook
+            </div>
+        `;
+        return;
+    }
+    
+    let html = `
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <div class="alert alert-success mb-0">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-instagram text-primary me-2 fs-5"></i>
+                        <div>
+                            <strong>Instagram: ${data.total_instagram} posts</strong><br>
+                            <small class="text-muted">Fonte: Instagram Business API</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="alert alert-primary mb-0">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-facebook text-primary me-2 fs-5"></i>
+                        <div>
+                            <strong>Facebook: ${data.total_facebook} posts</strong><br>
+                            <small class="text-muted">Fonte: Facebook Graph API</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+    `;
+    
+    // Posts do Instagram
+    instagramPosts.forEach(post => {
+        const postDate = new Date(post.timestamp).toLocaleString('pt-BR');
+        const mediaType = post.media_type || 'IMAGE';
+        const mediaTypeIcon = mediaType === 'VIDEO' ? 'bi-play-circle-fill' : 
+                             mediaType === 'CAROUSEL_ALBUM' ? 'bi-images' : 'bi-image-fill';
+        const mediaTypeText = mediaType === 'VIDEO' ? 'Vídeo' : 
+                             mediaType === 'CAROUSEL_ALBUM' ? 'Álbum' : 'Imagem';
+        
+        html += `
+            <div class="col-lg-4 col-md-6 mb-4">
+                <div class="card h-100 shadow-sm border-0">
+                    ${post.media_url ? `
+                        <div class="position-relative">
+                            ${mediaType === 'VIDEO' ? `
+                                <video class="card-img-top" style="height: 200px; object-fit: cover;" controls>
+                                    <source src="${post.media_url}" type="video/mp4">
+                                    Seu navegador não suporta vídeo.
+                                </video>
+                            ` : `
+                                <img src="${post.media_url}" class="card-img-top" style="height: 200px; object-fit: cover;" alt="Post do Instagram">
+                            `}
+                            <div class="position-absolute top-0 end-0 m-2">
+                                <span class="badge bg-primary">
+                                    <i class="${mediaTypeIcon} me-1"></i>${mediaTypeText}
+                                </span>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="card-body d-flex flex-column">
+                        <div class="mb-2">
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="bi bi-instagram text-primary me-2"></i>
+                                <small class="text-primary fw-bold">Instagram Post</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-auto">
+                            <p class="card-text small text-muted mb-2">
+                                <i class="bi bi-calendar3 me-1"></i>
+                                ${postDate}
+                            </p>
+                            <p class="card-text small">
+                                <i class="bi bi-hash me-1"></i>
+                                Post contém #${data.hashtag}
+                            </p>
+                            ${post.caption ? `
+                                <p class="card-text small text-dark">
+                                    ${post.caption.length > 100 ? post.caption.substring(0, 100) + '...' : post.caption}
+                                </p>
+                            ` : ''}
+                        </div>
+                        
+                        <div class="mt-3 d-flex gap-2">
+                            <a href="${post.permalink}" target="_blank" class="btn btn-primary btn-sm flex-fill">
+                                <i class="bi bi-box-arrow-up-right me-1"></i>
+                                Ver no Instagram
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    // Posts do Facebook
+    facebookPosts.forEach(post => {
+        const postDate = new Date(post.created_time).toLocaleString('pt-BR');
+        const postType = post.type || 'status';
+        const typeIcon = postType === 'photo' ? 'bi-image-fill' : 
+                        postType === 'video' ? 'bi-play-circle-fill' : 'bi-chat-text-fill';
+        const typeText = postType === 'photo' ? 'Foto' : 
+                        postType === 'video' ? 'Vídeo' : 'Texto';
+        
+        html += `
+            <div class="col-lg-4 col-md-6 mb-4">
+                <div class="card h-100 shadow-sm border-0">
+                    ${post.full_picture ? `
+                        <div class="position-relative">
+                            <img src="${post.full_picture}" class="card-img-top" style="height: 200px; object-fit: cover;" alt="Post do Facebook">
+                            <div class="position-absolute top-0 end-0 m-2">
+                                <span class="badge bg-primary">
+                                    <i class="${typeIcon} me-1"></i>${typeText}
+                                </span>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="card-body d-flex flex-column">
+                        <div class="mb-2">
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="bi bi-facebook text-primary me-2"></i>
+                                <small class="text-primary fw-bold">Facebook Post</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-auto">
+                            <p class="card-text small text-muted mb-2">
+                                <i class="bi bi-calendar3 me-1"></i>
+                                ${postDate}
+                            </p>
+                            <p class="card-text small">
+                                <i class="bi bi-hash me-1"></i>
+                                Post contém #${data.hashtag}
+                            </p>
+                            ${post.message ? `
+                                <p class="card-text small text-dark">
+                                    ${post.message.length > 100 ? post.message.substring(0, 100) + '...' : post.message}
+                                </p>
+                            ` : ''}
+                        </div>
+                        
+                        <div class="mt-3 d-flex gap-2">
+                            <a href="${post.permalink_url}" target="_blank" class="btn btn-primary btn-sm flex-fill">
+                                <i class="bi bi-box-arrow-up-right me-1"></i>
+                                Ver no Facebook
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    
+    if (totalPosts > 12) {
+        html += `
+            <div class="text-center mt-3">
+                <p class="text-muted">Mostrando os primeiros posts encontrados de ${totalPosts} no total</p>
+            </div>
+        `;
+    }
+    
+    resultsDiv.innerHTML = html;
 }
 
 function displayHashtagResults(data) {

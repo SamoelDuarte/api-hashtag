@@ -724,11 +724,6 @@ function displayAccounts(accountData) {
     });
 }
 
-// Carregar contas completas (pessoais + business) - agora via modal
-function loadAccountsComplete() {
-    showManualPageModal('business');
-}
-
 // Mostrar contas completas
 function displayAccountsComplete(data) {
     const container = document.getElementById('accounts-container');
@@ -991,6 +986,11 @@ function useManualPage() {
     
     // Limpar página atual
     currentManualPage = null;
+}
+
+// Carregar contas completas (pessoais + business) - via modal
+function loadAccountsComplete() {
+    showManualPageModal('business');
 }
 
 // Carregar contas usando Facebook SDK

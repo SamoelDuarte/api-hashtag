@@ -1683,9 +1683,6 @@ function displayMentionsResults(data, type) {
     
     resultsDiv.innerHTML = html;
 }
-    
-    resultsDiv.innerHTML = html;
-}
 
 // Testar se Laravel está funcionando
 function testLaravelConnection() {

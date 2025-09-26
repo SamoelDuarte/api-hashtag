@@ -254,7 +254,7 @@ class HashtagController extends Controller
             // 2. Buscar posts recentes da hashtag
             $postsResponse = Http::get("https://graph.facebook.com/v21.0/{$hashtagId}/recent_media", [
                 'user_id' => $instagramBusinessId,
-                'fields' => 'id,media_type,media_url,permalink,timestamp,caption,username',
+                'fields' => 'id,media_type,media_url,permalink,timestamp,caption',
                 'limit' => 25,
                 'access_token' => $platform->access_token
             ]);
